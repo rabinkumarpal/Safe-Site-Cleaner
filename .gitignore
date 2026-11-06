@@ -1,0 +1,5 @@
+.DS_Store
+ssc-data-*/
+*.sql
+*.sql.gz
+*.wpress
