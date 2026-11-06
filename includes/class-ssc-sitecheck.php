@@ -47,7 +47,14 @@ final class SSC_SiteCheck {
 				}
 			}
 		}
-		return array_values( array_unique( array_filter( $urls, 'is_string' ) ) );
+		$urls = array_filter( $urls, 'is_string' );
+		$home = home_url( '/' );
+		foreach ( $urls as $k => $u ) {
+			if ( untrailingslashit( $u ) === untrailingslashit( $home ) ) {
+				$urls[ $k ] = $home;
+			}
+		}
+		return array_values( array_unique( $urls ) );
 	}
 
 	/** Non-ASCII filenames must be percent-encoded or the check silently tests nothing. */
@@ -132,14 +139,17 @@ final class SSC_SiteCheck {
 
 	/** Uses the current admin's cookies in this request only. They are never saved to disk. */
 	public static function admin_screen_ok() {
-		if ( empty( $_COOKIE ) || ! is_user_logged_in() ) {
+		if ( ! is_user_logged_in() || ! wp_get_session_token() ) {
 			return null;
 		}
+		// Browsers send the admin login cookie only to /wp-admin, so a REST request never has it.
+		// Build a short-lived one for this one request. It is never saved.
+		$uid     = get_current_user_id();
+		$expire  = time() + 300;
+		$token   = wp_get_session_token();
 		$cookies = array();
-		foreach ( $_COOKIE as $k => $v ) {
-			if ( is_string( $v ) && false !== strpos( $k, 'wordpress' ) ) {
-				$cookies[] = new WP_Http_Cookie( array( 'name' => $k, 'value' => $v ) );
-			}
+		foreach ( array( AUTH_COOKIE => 'auth', SECURE_AUTH_COOKIE => 'secure_auth', LOGGED_IN_COOKIE => 'logged_in' ) as $name => $scheme ) {
+			$cookies[] = new WP_Http_Cookie( array( 'name' => $name, 'value' => wp_generate_auth_cookie( $uid, $expire, $scheme, $token ) ) );
 		}
 		$res = wp_remote_get( admin_url( 'plugins.php' ), self::args( array( 'cookies' => $cookies, 'redirection' => 0 ) ) );
 		if ( is_wp_error( $res ) ) {
@@ -168,6 +178,7 @@ final class SSC_SiteCheck {
 			$a = $after[ $url ];
 			if ( 200 === (int) $b['status'] && 200 !== (int) $a['status'] ) {
 				$problems[] = "Page now returns {$a['status']}: $url";
+				continue;
 			}
 			if ( empty( $b['fatal'] ) && ! empty( $a['fatal'] ) ) {
 				$problems[] = "Page now shows a PHP error: $url";

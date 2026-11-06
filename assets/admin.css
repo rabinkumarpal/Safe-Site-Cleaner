@@ -1,6 +1,6 @@
 .ssc { --ok:#1a7f37; --warn:#9a6700; --bad:#b42318; --line:#dcdcde; --muted:#50575e; max-width:1000px; }
 .ssc h2 { margin:0 0 6px; font-size:16px; }
-.ssc .card { background:#fff; border:1px solid var(--line); border-radius:6px; padding:18px 20px; margin:14px 0; }
+.ssc .card { max-width:none; background:#fff; border:1px solid var(--line); border-radius:6px; padding:18px 20px; margin:14px 0; }
 .ssc p { margin:6px 0; }
 .ssc .muted { color:var(--muted); }
 .ssc .bar { height:8px; background:#f0f0f1; border-radius:4px; overflow:hidden; margin:12px 0 6px; }
@@ -31,5 +31,6 @@
 .ssc .sticky .sum { flex:1; min-width:200px; }
 .ssc ul.list { margin:6px 0 6px 18px; list-style:disc; }
 .ssc input.phrase { width:140px; }
+.ssc .scroll { overflow-x:auto; }
 .ssc .history td, .ssc .history th { padding:8px 10px; vertical-align:top; }
 @media (max-width:600px) { .ssc .row { grid-template-columns:22px 1fr; } .ssc .row .size { grid-column:2; } }

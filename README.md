@@ -91,6 +91,7 @@ Under **Past cleanups**, click **Restore or delete**:
 
 - **Put files back only** leaves the database as it is.
 - **Restore files and database** needs you to type `RESTORE`. It replaces the database with the backup, so **anything added since the cleanup is lost**, including orders and form entries.
+- Restoring the database also restores login sessions, so if you signed in after the backup, you'll need to sign in again.
 - **Delete permanently** needs you to type `DELETE`, or `DELETE NOW` within 24 hours of the cleanup. This frees the disk space and **cannot be undone**. The database backup is kept unless you choose to delete it too.
 
 ## WP-CLI
@@ -143,23 +144,22 @@ Plugins that log visits may record the page checks as visits.
 
 ## Testing status
 
-So far it has been tested on one disposable copy of a real site (about 270 pages and 20,000 files, with Bricks and ACF), running PHP 8.5 through WP-CLI.
+So far it has been tested on one disposable copy of a real site (about 270 pages and 20,000 files, with Bricks and ACF), on macOS with PHP's built-in server and PHP 8.5, through both WP-CLI and the admin screen.
 
 **Tested and working:**
 
 - Scan decisions on planted cases: renamed files, gallery images, files used only in custom tables, recent files, documents, and consent and unknown tables
-- Automatic rollback after a deliberately broken page
-- Clean with repairs, followed by a full restore
-- Resuming after the process was killed during the page re-check
-- Permanent-delete phrases, path guards, and blocking of anonymous API requests
+- Automatic rollback when a public page breaks, and when the admin Plugins screen breaks
+- Clean with repairs, followed by a full restore from the command line
+- Recovery after the process was stopped during the backup, the backup test, the file move, the page re-check and a rollback
+- Typed confirmation phrases, path guards, and blocking of anonymous, subscriber, author and editor API requests
 
 **Not tested yet:**
 
-- Being killed during the backup, the file move or a rollback
-- The admin screen in a browser, including its logged-in admin check
-- Non-admin logged-in users
-- PHP 7.4 to 8.4 (the code is written for 7.4 and up, but has only run on 8.5)
-- Other hosts, Apache, WooCommerce, large sites, or a backup folder inside the web root
+- Restoring files and the database by clicking through the admin screen (the same code was tested from the command line)
+- PHP 7.4 to 8.1, which are declared as supported but have not been run. PHP 8.2 to 8.4 passed a syntax check only.
+- Apache, nginx, shared hosting, and real server time limits
+- WooCommerce, tables with foreign keys or triggers, large sites, and a backup folder inside the web root
 
 ## Good to know
 

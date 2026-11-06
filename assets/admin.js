@@ -65,7 +65,7 @@
 		var words = { applied: 'Cleaned and verified', rolled_back: 'Rolled back automatically', restored: 'Restored', stopped: 'Stopped' };
 		return el('div', { class: 'card' }, [
 			el('h2', {}, 'Past cleanups'),
-			el('table', { class: 'widefat striped history' }, [
+			el('div', { class: 'scroll' }, el('table', { class: 'widefat striped history' }, [
 				el('thead', {}, el('tr', {}, [el('th', {}, 'Date'), el('th', {}, 'Result'), el('th', {}, 'In quarantine'), el('th', {}, 'DB backup'), el('th', {}, '')])),
 				el('tbody', {}, runs.map(function (r) {
 					return el('tr', {}, [
@@ -73,10 +73,10 @@
 						el('td', {}, (words[r.outcome] || r.outcome) + (r.purged ? ' (quarantine deleted)' : '')),
 						el('td', {}, size(r.quarantine_bytes)),
 						el('td', {}, r.backup_bytes ? size(r.backup_bytes) : '—'),
-						el('td', {}, r.purged ? '' : el('button', { class: 'button', on: { click: function () { manage(r); } } }, 'Restore or delete…'))
+						el('td', {}, r.outcome === 'applied' && !r.purged ? el('button', { class: 'button', on: { click: function () { manage(r); } } }, 'Restore or delete…') : '')
 					]);
 				}))
-			])
+			]))
 		]);
 	}
 
@@ -241,7 +241,7 @@
 			var after = v.stats_after || {};
 			head = box('good', [el('b', {}, 'Cleaned and verified. '), size(after.moved_bytes) + ' moved to quarantine, ' + (after.repaired || 0) + ' repaired. ' + after.pages + ' pages and ' + after.assets + ' files match or improve on the earlier check.']);
 		} else if (v.outcome === 'rolled_back') {
-			head = box('bad', [el('b', {}, 'Problems were found, so everything was put back. '), 'Your site is as it was before the cleanup.', el('ul', { class: 'list' }, v.problems.slice(0, 20).map(function (p) { return el('li', {}, p); }))]);
+			head = box('bad', [el('b', {}, 'Problems were found, so everything was put back. '), (v.restore_problems || []).length ? 'Some differences remain, listed below.' : 'Your pages and files match the earlier check.', el('p', {}, 'What triggered it' + (v.problems.length > 20 ? ' (first 20 of ' + v.problems.length + ')' : '') + ':'), el('ul', { class: 'list' }, v.problems.slice(0, 20).map(function (p) { return el('li', {}, p); }))]);
 		} else if (v.outcome === 'restored') {
 			head = box('good', 'Restored.');
 		} else {
@@ -253,7 +253,7 @@
 			show(
 				el('div', { class: 'card' }, [el('h2', {}, 'Result'), head, rest,
 					v.outcome === 'applied' ? el('p', {}, 'Now please click through your site: forms, logged-in pages, and the page builder. The quarantine stays until you delete it.') : null,
-					v.outcome === 'applied' && v.admin_checked === false ? el('p', { class: 'muted' }, 'The admin screen could not be checked automatically.') : null,
+					v.outcome === 'applied' ? el('p', { class: 'muted' }, v.admin_checked ? 'The admin Plugins screen was also checked.' : 'The admin screen could not be checked automatically, so please open it yourself.') : null,
 					el('details', {}, [el('summary', {}, 'Details'), el('ul', { class: 'list' }, v.log.map(function (l) { return el('li', {}, l); }))]),
 					el('div', { class: 'toolbar' }, el('button', { class: 'button', on: { click: home } }, 'Done'))
 				]),

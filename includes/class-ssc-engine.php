@@ -142,6 +142,10 @@ final class SSC_Engine {
 		if ( ! empty( $s['purged'] ) ) {
 			throw new RuntimeException( 'This run was permanently deleted and cannot be restored.' );
 		}
+		// Going back again would replace the database with an old backup and lose everything since.
+		if ( in_array( $s['outcome'] ?? '', array( 'restored', 'rolled_back' ), true ) ) {
+			throw new RuntimeException( 'This cleanup has already been undone.' );
+		}
 		if ( $with_db && ! is_file( SSC_Backup::file( $run ) ) ) {
 			throw new RuntimeException( 'The database backup for this run is gone.' );
 		}
@@ -551,7 +555,7 @@ final class SSC_Engine {
 		$problems = self::comparison( $s, $run, 'pages_after', 'assets_after' );
 		$admin    = SSC_SiteCheck::admin_screen_ok();
 		if ( false === $admin ) {
-			$problems[] = 'The admin Plugins screen now shows an error.';
+			array_unshift( $problems, 'The admin Plugins screen now shows an error.' );
 		}
 		$s['admin_checked'] = null !== $admin;
 		if ( $problems ) {
