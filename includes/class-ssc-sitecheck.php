@@ -115,7 +115,8 @@ final class SSC_SiteCheck {
 		if ( preg_match_all( '~(?<![\w/.-])' . $pre . '(' . preg_quote( (string) $rel, '~' ) . '/[^"\'\s<>()\\\\,]+)~i', $body, $m ) ) {
 			foreach ( $m[1] as $p ) {
 				$p = rawurldecode( (string) strtok( $p, '?#' ) );
-				if ( ! preg_match( '/\.php$/i', $p ) ) {
+				// Files only: this skips PHP, folder URLs, and wildcard patterns from prefetch rules.
+				if ( false === strpos( $p, '*' ) && ! preg_match( '/\.php$/i', $p ) && preg_match( '/\.[a-z0-9]{1,8}$/i', $p ) ) {
 					$out[ $p ] = 1;
 				}
 			}
@@ -124,6 +125,13 @@ final class SSC_SiteCheck {
 	}
 
 	public static function head( $path ) {
+		// WordPress's HTTP library undoes the encoding of non-ASCII URLs, so servers can wrongly
+		// answer 404. For these names, check the file itself.
+		if ( preg_match( '/[^\x20-\x7e]/', $path ) ) {
+			$root = (string) wp_parse_url( site_url( '/' ), PHP_URL_PATH );
+			$rel  = 0 === strpos( $path, $root ) ? substr( $path, strlen( $root ) ) : ltrim( $path, '/' );
+			return is_file( ABSPATH . $rel ) ? 200 : 404;
+		}
 		$scheme = wp_parse_url( home_url(), PHP_URL_SCHEME );
 		$host   = wp_parse_url( home_url(), PHP_URL_HOST );
 		$port   = wp_parse_url( home_url(), PHP_URL_PORT );
