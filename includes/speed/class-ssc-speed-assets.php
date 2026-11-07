@@ -258,7 +258,7 @@ final class SSC_Speed_Assets {
 				'owner'       => $third_party ? (string) $host : self::owner( $url ),
 				'third_party' => (bool) $third_party,
 				'state'       => $row['state'],
-				'by'          => $row['by'] ?? ( isset( $row['url'] ) && 'delayed' === $row['state'] ? 'Safe Site Cleaner' : '' ),
+				'by'          => $row['by'] ?? ( isset( $row['url'] ) && 'delayed' === $row['state'] ? 'Safe Site Cleaner & Performance' : '' ),
 				'bytes'       => $bytes,
 				'exact'       => $exact,
 			);

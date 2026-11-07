@@ -1,5 +1,5 @@
 <?php
-/** The Tools > Safe Site Cleaner screen. */
+/** The Tools > Safe Site Cleaner & Performance screen. */
 
 defined( 'ABSPATH' ) || exit;
 
@@ -7,8 +7,8 @@ final class SSC_Admin {
 
 	public static function menu() {
 		$hook = add_management_page(
-			__( 'Safe Site Cleaner', 'safe-site-cleaner' ),
-			__( 'Safe Site Cleaner', 'safe-site-cleaner' ),
+			__( 'Safe Site Cleaner & Performance', 'safe-site-cleaner' ),
+			__( 'Safe Site Cleaner & Performance', 'safe-site-cleaner' ),
 			'manage_options',
 			SSC_SLUG,
 			array( __CLASS__, 'render' )
@@ -53,7 +53,7 @@ final class SSC_Admin {
 			return;
 		}
 		$url = admin_url( 'tools.php?page=' . SSC_SLUG );
-		echo '<div class="wrap ssc"><h1>' . esc_html__( 'Safe Site Cleaner', 'safe-site-cleaner' ) . '</h1>';
+		echo '<div class="wrap ssc"><h1>' . esc_html__( 'Safe Site Cleaner & Performance', 'safe-site-cleaner' ) . '</h1>';
 		echo '<nav class="nav-tab-wrapper">';
 		$tabs = array(
 			'clean'    => array( $url, __( 'Clean', 'safe-site-cleaner' ) ),

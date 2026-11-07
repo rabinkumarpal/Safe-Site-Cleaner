@@ -1,4 +1,4 @@
-=== Safe Site Cleaner ===
+=== Safe Site Cleaner & Performance ===
 Requires at least: 5.9
 Requires PHP: 7.4
 Stable tag: 1.7.0

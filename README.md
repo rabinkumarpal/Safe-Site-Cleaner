@@ -1,4 +1,4 @@
-# Safe Site Cleaner
+# Safe Site Cleaner & Performance
 
 A WordPress plugin that finds unused plugins, media, leftovers and database bloat, then checks your real pages before and after cleaning. Files go to quarantine instead of being deleted, and if a page gets worse, the cleanup rolls itself back.
 
@@ -62,7 +62,7 @@ Or copy the folder to `wp-content/plugins/safe-site-cleaner` and activate it.
 
 ### 1. Scan
 
-Go to **Tools > Safe Site Cleaner**, choose how many revisions to keep per post, and click **Scan site**. Large sites can take several minutes. If the page closes, come back and the job continues.
+Go to **Tools > Safe Site Cleaner & Performance**, choose how many revisions to keep per post, and click **Scan site**. Large sites can take several minutes. If the page closes, come back and the job continues.
 
 ### 2. Review
 
@@ -184,7 +184,7 @@ After a cleanup, the result shows the home page's size, files and blocking files
 
 ## Working with other speed plugins
 
-Safe Site Cleaner is built to run alongside caching and optimization plugins. It detects these and adjusts:
+Safe Site Cleaner & Performance is built to run alongside caching and optimization plugins. It detects these and adjusts:
 
 | Plugin | Detected | What it reads | Cache cleared after a change |
 |---|---|---|---|

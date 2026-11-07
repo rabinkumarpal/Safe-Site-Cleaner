@@ -33,7 +33,7 @@ final class SSC_Speed_Profile {
 	public static function rows( $data ) {
 		if ( is_array( $data ) && isset( $data['format'] ) ) {
 			if ( self::FORMAT !== $data['format'] ) {
-				throw new InvalidArgumentException( 'This is not a Safe Site Cleaner speed profile.' );
+				throw new InvalidArgumentException( 'This is not a Safe Site Cleaner & Performance speed profile.' );
 			}
 			if ( (int) ( $data['version'] ?? 0 ) > 1 ) {
 				throw new InvalidArgumentException( 'This profile came from a newer version of the plugin. Update the plugin first.' );

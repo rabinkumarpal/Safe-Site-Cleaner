@@ -1,6 +1,6 @@
 <?php
 /**
- * Plugin Name:       Safe Site Cleaner
+ * Plugin Name:       Safe Site Cleaner & Performance
  * Description:       Finds unused plugins, media, leftovers and database bloat, and applies speed rules you can switch on and off. Checks real pages before and after, moves files to quarantine instead of deleting, and rolls back automatically if anything breaks.
  * Version:           1.7.0
  * Requires at least: 5.9
@@ -39,7 +39,7 @@ register_activation_hook(
 	static function () {
 		if ( is_multisite() ) {
 			deactivate_plugins( plugin_basename( __FILE__ ) );
-			wp_die( esc_html__( 'Safe Site Cleaner does not support multisite. It was not activated, and nothing was changed.', 'safe-site-cleaner' ) );
+			wp_die( esc_html__( 'Safe Site Cleaner & Performance does not support multisite. It was not activated, and nothing was changed.', 'safe-site-cleaner' ) );
 		}
 	}
 );
