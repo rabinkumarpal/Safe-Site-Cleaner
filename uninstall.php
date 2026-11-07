@@ -10,4 +10,6 @@ delete_option( 'ssc_data_dir' );
 delete_option( 'ssc_speed_rules' );
 delete_option( 'ssc_speed_results' );
 delete_option( 'ssc_speed_psi_key' );
+delete_option( 'ssc_speed_trial' );
+wp_clear_scheduled_hook( 'ssc_speed_trial_end' );
 delete_transient( 'ssc_speed_sureforms_unused' );

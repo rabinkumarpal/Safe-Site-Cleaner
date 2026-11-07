@@ -26,11 +26,20 @@ final class SSC_Rest {
 			array( 'speed/psi', 'POST', 'speed_psi' ),
 			array( 'speed/key', 'POST', 'speed_key' ),
 			array( 'speed/key-test', 'POST', 'speed_key_test' ),
+			array( 'speed/profile', 'GET', 'speed_profile' ),
+			array( 'speed/profile-check', 'POST', 'speed_profile_check' ),
+			array( 'speed/profile-import', 'POST', 'speed_profile_import' ),
+			array( 'speed/preview', 'POST', 'speed_preview' ),
+			array( 'speed/trial', 'POST', 'speed_trial' ),
+			array( 'speed/keep', 'POST', 'speed_keep' ),
+			array( 'speed/undo', 'POST', 'speed_undo' ),
 		);
 		// These only ever run for this API, so visitors' page loads don't pay for them.
 		require_once SSC_DIR . 'includes/speed/class-ssc-speed-assets.php';
 		require_once SSC_DIR . 'includes/speed/class-ssc-speed-psi.php';
 		require_once SSC_DIR . 'includes/speed/class-ssc-speed-results.php';
+		require_once SSC_DIR . 'includes/speed/class-ssc-speed-suggest.php';
+		require_once SSC_DIR . 'includes/speed/class-ssc-speed-profile.php';
 		foreach ( $routes as $r ) {
 			register_rest_route(
 				self::NS,
@@ -114,7 +123,8 @@ final class SSC_Rest {
 	}
 
 	private static function speed( WP_REST_Request $r ) {
-		return array( 'rules' => SSC_Speed_Rules::view() );
+		$trial = SSC_Speed_Rules::trial();
+		return array( 'rules' => SSC_Speed_Rules::view(), 'trial' => (bool) $trial, 'trial_ids' => $trial ? array_keys( $trial['was'] ) : array() );
 	}
 
 	/** A rule changing mid-cleanup would show up in the before-and-after check as damage. */
@@ -124,14 +134,81 @@ final class SSC_Rest {
 		}
 	}
 
+	private static function assert_no_trial() {
+		if ( SSC_Speed_Rules::trial() ) {
+			throw new RuntimeException( 'A speed test is still running. Keep or undo it first.' );
+		}
+	}
+
+	private static function rule_ids( WP_REST_Request $r ) {
+		$ids = $r->get_param( 'ids' );
+		$ids = is_array( $ids ) ? array_values( array_unique( array_map( 'strval', $ids ) ) ) : array();
+		if ( ! SSC_Speed_Rules::has( $ids ) ) {
+			throw new InvalidArgumentException( 'Unknown rule.' );
+		}
+		return $ids;
+	}
+
+	private static function speed_profile( WP_REST_Request $r ) {
+		return SSC_Speed_Profile::export();
+	}
+
+	private static function speed_profile_check( WP_REST_Request $r ) {
+		return array( 'rows' => SSC_Speed_Profile::check( $r->get_param( 'profile' ) ) );
+	}
+
+	/** Imported rules stay off unless asked, because they haven't been tested on this site. */
+	private static function speed_profile_import( WP_REST_Request $r ) {
+		self::assert_no_cleanup();
+		self::assert_no_trial();
+		$rows = SSC_Speed_Profile::rows( $r->get_param( 'profile' ) );
+		$keep = true === $r->get_param( 'keep_on' );
+		foreach ( $rows as &$row ) {
+			if ( is_array( $row ) && ! $keep ) {
+				$row['enabled'] = false;
+			}
+		}
+		unset( $row );
+		$done = SSC_Speed_Rules::import( $rows );
+		return array( 'imported' => count( $done['ids'] ), 'rules' => SSC_Speed_Rules::view() );
+	}
+
+	private static function speed_preview( WP_REST_Request $r ) {
+		$url = SSC_Speed_Results::page_url( $r->get_param( 'url' ) );
+		$ids = self::rule_ids( $r );
+		return array(
+			'before' => SSC_Speed::preview_url( $url, array(), $ids ),
+			'after'  => SSC_Speed::preview_url( $url, $ids, array() ),
+			'live'   => SSC_Speed::preview_url( $url, array(), array() ),
+		);
+	}
+
+	private static function speed_trial( WP_REST_Request $r ) {
+		self::assert_no_cleanup();
+		$url = SSC_Speed_Results::page_url( $r->get_param( 'url' ) );
+		return array( 'problems' => SSC_Speed_Rules::start_trial( self::rule_ids( $r ), $url ) );
+	}
+
+	private static function speed_keep( WP_REST_Request $r ) {
+		SSC_Speed_Rules::keep_trial();
+		return array( 'ok' => true );
+	}
+
+	private static function speed_undo( WP_REST_Request $r ) {
+		SSC_Speed_Rules::undo_trial();
+		return array( 'ok' => true );
+	}
+
 	private static function speed_toggle( WP_REST_Request $r ) {
 		self::assert_no_cleanup();
+		self::assert_no_trial();
 		SSC_Speed_Rules::set_enabled( (string) $r->get_param( 'id' ), (bool) $r->get_param( 'enabled' ) );
 		return array( 'rules' => SSC_Speed_Rules::view() );
 	}
 
 	private static function speed_delete( WP_REST_Request $r ) {
 		self::assert_no_cleanup();
+		self::assert_no_trial();
 		SSC_Speed_Rules::delete( (string) $r->get_param( 'id' ) );
 		return array( 'rules' => SSC_Speed_Rules::view() );
 	}
@@ -142,7 +219,16 @@ final class SSC_Rest {
 		if ( ! is_array( $rows ) ) {
 			throw new InvalidArgumentException( 'No rules to import.' );
 		}
-		return array( 'imported' => SSC_Speed_Rules::import( $rows ), 'rules' => SSC_Speed_Rules::view() );
+		$done = SSC_Speed_Rules::import( $rows );
+		return array( 'imported' => count( $done['ids'] ), 'ids' => $done['ids'], 'created' => $done['created'], 'rules' => SSC_Speed_Rules::view() );
+	}
+
+	private static function with_fixes( $url, $page ) {
+		return array(
+			'url'   => $url,
+			'page'  => $page,
+			'fixes' => ! empty( $page['assets'] ) ? SSC_Speed_Suggest::build( $page['assets'] ) : array(),
+		);
 	}
 
 	private static function speed_pages( WP_REST_Request $r ) {
@@ -156,18 +242,18 @@ final class SSC_Rest {
 
 	private static function speed_result( WP_REST_Request $r ) {
 		$url = SSC_Speed_Results::page_url( $r->get_param( 'url' ) );
-		return array( 'url' => $url, 'page' => SSC_Speed_Results::get( $url ) );
+		return self::with_fixes( $url, SSC_Speed_Results::get( $url ) );
 	}
 
 	private static function speed_scan( WP_REST_Request $r ) {
 		$url = SSC_Speed_Results::page_url( $r->get_param( 'url' ) );
-		return array( 'url' => $url, 'page' => SSC_Speed_Results::save_assets( $url, SSC_Speed_Assets::scan( $url ) ) );
+		return self::with_fixes( $url, SSC_Speed_Results::save_assets( $url, SSC_Speed_Assets::scan( $url ) ) );
 	}
 
 	private static function speed_psi( WP_REST_Request $r ) {
 		$url      = SSC_Speed_Results::page_url( $r->get_param( 'url' ) );
 		$strategy = 'desktop' === $r->get_param( 'strategy' ) ? 'desktop' : 'mobile';
-		return array( 'url' => $url, 'page' => SSC_Speed_Results::save_psi( $url, $strategy, SSC_Speed_Psi::run( $url, $strategy ) ) );
+		return self::with_fixes( $url, SSC_Speed_Results::save_psi( $url, $strategy, SSC_Speed_Psi::run( $url, $strategy ) ) );
 	}
 
 	private static function speed_key( WP_REST_Request $r ) {

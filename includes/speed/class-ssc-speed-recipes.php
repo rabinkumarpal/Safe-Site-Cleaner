@@ -18,12 +18,24 @@ final class SSC_Speed_Recipes {
 		'conditional-logic' => array( array( 'sureforms-pro-conditional-logic' ), array() ),
 	);
 
+	const LIST = array(
+		'sureforms_unused'   => 'Drops SureForms Pro files for field types no published form uses. They come back if a form starts using them.',
+		'wp_emoji'           => 'Removes the script WordPress adds to draw emoji on old browsers. Current browsers show emoji without it.',
+		'jquery_migrate'     => 'Stops loading jQuery Migrate, which only helps code written for old versions of jQuery.',
+		'dashicons_visitors' => 'Stops loading the Dashicons icon font for logged-out visitors, unless another stylesheet needs it. Logged-in users keep it for the admin bar.',
+	);
+
 	public static function exists( $name ) {
-		return 'sureforms_unused' === $name;
+		return isset( self::LIST[ $name ] );
 	}
 
+	public static function what( $name ) {
+		return self::LIST[ $name ] ?? '';
+	}
+
+	/** False when the plugin a recipe is for isn't active. WordPress's own recipes always apply. */
 	public static function available( $name ) {
-		return 'sureforms_unused' === $name && defined( 'SRFM_PRO_VER' );
+		return self::exists( $name ) && ( 'sureforms_unused' !== $name || defined( 'SRFM_PRO_VER' ) );
 	}
 
 	/** Runs on every request type. Forms are saved from the admin and REST, where no rule runs. */
@@ -42,6 +54,40 @@ final class SSC_Speed_Recipes {
 			add_action( 'wp_print_styles', array( __CLASS__, 'drop_sureforms' ), 1 );
 			add_action( 'wp_print_scripts', array( __CLASS__, 'drop_sureforms' ), 1 );
 			add_action( 'wp_print_footer_scripts', array( __CLASS__, 'drop_sureforms' ), 1 );
+		} elseif ( 'wp_emoji' === $name ) {
+			add_action( 'wp', array( __CLASS__, 'drop_emoji' ) );
+		} elseif ( 'jquery_migrate' === $name ) {
+			add_action( 'wp', array( __CLASS__, 'drop_migrate' ) );
+		} elseif ( 'dashicons_visitors' === $name ) {
+			add_action( 'wp_print_styles', array( __CLASS__, 'drop_dashicons' ), 1 );
+			add_action( 'wp_print_footer_scripts', array( __CLASS__, 'drop_dashicons' ), 1 );
+		}
+	}
+
+	/* These wait for 'wp' because the page builder check isn't reliable until the theme has loaded. */
+
+	public static function drop_emoji() {
+		if ( SSC_Speed::skip() ) {
+			return;
+		}
+		remove_action( 'wp_head', 'print_emoji_detection_script', 7 );
+		remove_action( 'wp_enqueue_scripts', 'wp_enqueue_emoji_styles' );
+		remove_action( 'wp_print_styles', 'print_emoji_styles' );
+	}
+
+	public static function drop_migrate() {
+		if ( SSC_Speed::skip() ) {
+			return;
+		}
+		$jquery = wp_scripts()->registered['jquery'] ?? null;
+		if ( $jquery ) {
+			$jquery->deps = array_values( array_diff( $jquery->deps, array( 'jquery-migrate' ) ) );
+		}
+	}
+
+	public static function drop_dashicons() {
+		if ( ! is_user_logged_in() && ! SSC_Speed::skip() ) {
+			wp_dequeue_style( 'dashicons' );
 		}
 	}
 

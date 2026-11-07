@@ -235,6 +235,31 @@
 	}
 	function review_back() { review(); }
 
+	/* What the cleanup did for speed. Says so plainly when the answer is nothing visible. */
+	function gain(b, a) {
+		if (!b || !a) { return null; }
+		var rows = [];
+		function row(name, from, to) { rows.push(el('tr', {}, [el('td', {}, name), el('td', { class: 'num' }, from), el('td', { class: 'num' }, to)])); }
+		if (b.score !== undefined && a.score !== undefined) { row('Google mobile score', b.score, a.score); }
+		if (b.bytes !== undefined && a.bytes !== undefined) {
+			row('Home page size', size(b.bytes), size(a.bytes));
+			row('Home page files', b.files, a.files);
+			row('Files that block first paint', b.blocking, a.blocking);
+		}
+		row('Settings loaded on every page', size(b.autoload_bytes), size(a.autoload_bytes));
+		var lighter = (b.bytes || 0) - (a.bytes || 0) >= 1024 || (b.files || 0) > (a.files || 0);
+		var quicker = b.autoload_bytes - a.autoload_bytes >= 1024;
+		return el('div', { class: 'section' }, [
+			el('h3', {}, 'Effect on speed'),
+			el('p', {}, lighter ? 'The home page got lighter.' : quicker ? 'Every page now loads fewer settings from the database.' : 'The home page loads the same as before. Unused items often don\'t load on pages at all, so this cleanup mainly freed space.'),
+			el('div', { class: 'scroll' }, el('table', { class: 'widefat striped data' }, [
+				el('thead', {}, el('tr', {}, [el('th', {}, ''), el('th', { class: 'num' }, 'Before'), el('th', { class: 'num' }, 'After')])),
+				el('tbody', {}, rows)
+			])),
+			b.score !== undefined && a.score !== undefined ? el('p', { class: 'muted' }, 'Google scores move a few points between tests even when nothing changes.') : null
+		]);
+	}
+
 	function result(v) {
 		var head;
 		if (v.outcome === 'applied') {
@@ -252,6 +277,7 @@
 			state.status = s;
 			show(
 				el('div', { class: 'card' }, [el('h2', {}, 'Result'), head, rest,
+					v.outcome === 'applied' ? gain(v.speed_before, v.speed_after) : null,
 					v.outcome === 'applied' ? el('p', {}, 'Now please click through your site: forms, logged-in pages, and the page builder. The quarantine stays until you delete it.') : null,
 					v.outcome === 'applied' ? el('p', { class: 'muted' }, v.admin_checked ? 'The admin Plugins screen was also checked.' : 'The admin screen could not be checked automatically, so please open it yourself.') : null,
 					el('details', {}, [el('summary', {}, 'Details'), el('ul', { class: 'list' }, v.log.map(function (l) { return el('li', {}, l); }))]),

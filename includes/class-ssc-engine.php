@@ -13,7 +13,7 @@ final class SSC_Engine {
 
 	private static $steps = array(
 		'scan'    => array( 'refs_db', 'refs_code', 'crawl_base', 'assets_base', 'analyze' ),
-		'apply'   => array( 'preflight', 'backup', 'verify_backup', 'files', 'database', 'flush', 'crawl_after', 'assets_after', 'decide' ),
+		'apply'   => array( 'preflight', 'speed_before', 'backup', 'verify_backup', 'files', 'database', 'flush', 'crawl_after', 'assets_after', 'speed_after', 'decide' ),
 		'restore' => array( 'rb_files', 'rb_load', 'rb_swap', 'rb_crawl', 'rb_assets', 'rb_check' ),
 	);
 
@@ -24,6 +24,8 @@ final class SSC_Engine {
 		'assets_base'   => 'Checking files the pages use',
 		'analyze'       => 'Working out what is safe',
 		'preflight'     => 'Running safety checks',
+		'speed_before'  => 'Measuring the home page',
+		'speed_after'   => 'Measuring the home page again',
 		'backup'        => 'Backing up the database',
 		'verify_backup' => 'Test-restoring the backup',
 		'files'         => 'Moving files to quarantine',
@@ -546,6 +548,25 @@ final class SSC_Engine {
 		);
 	}
 
+	private static function step_speed_before( array &$s, $run, $deadline ) {
+		return self::speed_step( $s, 'speed_before' );
+	}
+
+	private static function step_speed_after( array &$s, $run, $deadline ) {
+		return self::speed_step( $s, 'speed_after' );
+	}
+
+	/** Always finishes: a failed measurement must not stop or roll back a cleanup. */
+	private static function speed_step( array &$s, $key ) {
+		try {
+			require_once SSC_DIR . 'includes/speed/class-ssc-speed-gain.php';
+			$s[ $key ] = SSC_Speed_Gain::measure();
+		} catch ( Throwable $e ) {
+			self::log( $s, 'The home page could not be measured: ' . $e->getMessage() );
+		}
+		return true;
+	}
+
 	private static function step_decide( array &$s, $run, $deadline ) {
 		$problems = self::comparison( $s, $run, 'pages_after', 'assets_after' );
 		$admin    = SSC_SiteCheck::admin_screen_ok();
@@ -708,6 +729,8 @@ final class SSC_Engine {
 			'can_verify' => ! empty( $s['can_verify'] ),
 			'stats'    => $s['stats'] ?? null,
 			'stats_after' => $s['stats_after'] ?? null,
+			'speed_before' => $s['speed_before'] ?? null,
+			'speed_after'  => $s['speed_after'] ?? null,
 			'admin_checked' => $s['admin_checked'] ?? null,
 			'scanned'  => $s['scanned'] ?? 0,
 			'applied'  => $s['applied'] ?? 0,

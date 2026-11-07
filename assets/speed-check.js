@@ -3,7 +3,7 @@
 	'use strict';
 	var ui = window.SSCUI, el = ui.el, api = ui.api, box = ui.box;
 	var host = el('div', {});
-	var state = { pages: [], url: '', page: null, hasKey: false, reachable: true, busy: '', errors: {}, filter: 'all' };
+	var state = { fixes: [], pages: [], url: '', page: null, hasKey: false, reachable: true, busy: '', errors: {}, filter: 'all' };
 
 	var WORDS = { good: 'Good', average: 'Needs work', poor: 'Poor' };
 	var LOADS = {
@@ -27,6 +27,7 @@
 	function fetchSaved() {
 		return api('speed/result?url=' + encodeURIComponent(state.url)).then(function (d) {
 			state.page = d.page;
+			state.fixes = d.fixes || [];
 			state.errors = {};
 			render();
 		});
@@ -37,6 +38,7 @@
 		render();
 		var chain = api('speed/scan', 'POST', { url: state.url }).then(function (d) {
 			state.page = d.page;
+			state.fixes = d.fixes || [];
 		}).catch(function (e) { state.errors.assets = e.message; });
 		// Some hosts stop a site loading itself, so a failed scan doesn't rule out Google's test.
 		if (state.reachable) {
@@ -57,6 +59,7 @@
 		return api('speed/result?url=' + encodeURIComponent(typed || state.url)).then(function (d) {
 			state.url = d.url;
 			state.page = d.page;
+			state.fixes = d.fixes || [];
 			if (!state.pages.some(function (p) { return p.url === d.url; })) { state.pages.push({ url: d.url, label: d.url }); }
 			return runChecks();
 		}).catch(function (e) {
@@ -205,6 +208,35 @@
 		];
 	}
 
+	/* The chosen page goes last, so it is the one left on screen. Rules apply site-wide, so a few others are tried too. */
+	function testPages() {
+		var others = state.pages.map(function (p) { return p.url; }).filter(function (u) { return u !== state.url; }).slice(0, 2);
+		return others.concat([state.url]);
+	}
+
+	function fixes() {
+		if (!state.fixes.length) { return []; }
+		var act = state.fixes.filter(function (f) { return f.rule; }), advice = state.fixes.filter(function (f) { return !f.rule; });
+		var low = act.filter(function (f) { return f.level === 'low'; });
+		var disabled = !!state.busy || ui.speedTry.isRunning();
+		function run(list, label, auto) {
+			ui.speedTry.tryRules(list.map(function (f) { return f.rule; }), { label: label, auto: auto, pages: testPages() })
+				.catch(function (e) { state.errors.address = e.message; render(); });
+		}
+		return [el('div', { class: 'section' }, [
+			el('h3', {}, 'Suggested fixes'),
+			act.length ? el('p', { class: 'muted' }, 'Every fix is tested on real pages first, and it undoes itself if a page gets worse.') : el('p', { class: 'muted' }, 'Nothing to apply on this page right now.'),
+			low.length ? el('div', { class: 'toolbar' }, el('button', { class: 'button button-primary', disabled: disabled, on: { click: function () { run(low, low.length === 1 ? low[0].title : low.length + ' low-risk fixes', true); } } }, low.length === 1 ? 'Apply the low-risk fix' : 'Apply ' + low.length + ' low-risk fixes')) : null
+		].concat(act.map(function (f) {
+			return el('div', { class: 'fix' }, [
+				el('div', {}, [el('b', {}, f.title), ' ', el('span', { class: 'pill ' + (f.level === 'low' ? 'low' : 'review') }, f.level === 'low' ? 'low risk' : 'compare first'), el('div', { class: 'why' }, f.why)]),
+				el('button', { class: 'button', disabled: disabled, on: { click: function () { run([f], f.title, f.level === 'low'); } } }, f.level === 'low' ? 'Apply' : 'Test and compare')
+			]);
+		}), advice.length ? [el('h3', { style: 'margin-top:14px' }, 'Worth a look')].concat(advice.map(function (f) {
+			return el('div', { class: 'fix' }, el('div', {}, [el('b', {}, f.title), el('div', { class: 'why' }, f.why)]));
+		})) : []))];
+	}
+
 	function render() {
 		host.textContent = '';
 		var nodes = [
@@ -213,7 +245,7 @@
 			picker(),
 			state.busy ? box('', state.busy) : null,
 			state.errors.address ? box('bad', state.errors.address) : null
-		].concat(scores(), assets(), [el('p', { class: 'muted section' }, ['PageSpeed API key: ', state.hasKey ? 'saved' : 'none', '. ', el('a', { href: SSC.page + '&tab=settings' }, 'Change in Settings'), '.'])]);
+		].concat(scores(), fixes(), assets(), [el('p', { class: 'muted section' }, ['PageSpeed API key: ', state.hasKey ? 'saved' : 'none', '. ', el('a', { href: SSC.page + '&tab=settings' }, 'Change in Settings'), '.'])]);
 		host.appendChild(el('div', { class: 'card' }, nodes));
 	}
 
@@ -230,5 +262,9 @@
 		});
 	}
 
-	ui.speedCheck = { host: host, start: start };
+	function refresh() {
+		if (state.url) { fetchSaved().catch(function () {}); }
+	}
+
+	ui.speedCheck = { host: host, start: start, refresh: refresh, pages: function () { return testPages(); } };
 }());

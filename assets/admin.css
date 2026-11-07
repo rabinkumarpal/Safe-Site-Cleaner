@@ -60,3 +60,11 @@
 .ssc .weight .value { text-align:right; font-variant-numeric:tabular-nums; }
 .ssc .segmented .button.active { background:#f0f6fc; border-color:#2271b1; color:#135e96; }
 @media (max-width:600px) { .ssc .weight { grid-template-columns:1fr 76px; } .ssc .weight .track { grid-column:1 / -1; grid-row:2; } }
+.ssc .preview-stage { display:flex; flex-wrap:wrap; gap:14px; margin-top:12px; }
+.ssc .preview-col { flex:1 1 280px; min-width:0; max-width:390px; }
+.ssc .preview-label { padding:4px 0; }
+.ssc .preview-frame { display:block; width:100%; height:640px; border:1px solid var(--line); border-radius:6px; background:#fff; }
+.ssc .fix { border-top:1px solid #f0f0f1; padding:10px 0; display:grid; grid-template-columns:1fr auto; gap:6px 14px; align-items:start; }
+.ssc .fix:first-of-type { border-top:0; }
+.ssc .fix .why { color:var(--muted); font-size:12px; margin-top:2px; }
+.ssc .data .sub.problem { color:var(--bad); }

@@ -42,6 +42,11 @@ final class SSC_Speed_Assets {
 				'lazy_images'      => $found['lazy_images'],
 				'response_ms'      => $page['ms'],
 			),
+			'hints'  => array(
+				'priority_lazy' => $found['priority_lazy'],
+				'emoji'         => $found['emoji'],
+				'fonts'         => self::upload_fonts( $found['fonts'] ),
+			),
 			'owners' => self::owners( $rows ),
 			'assets' => array_slice( $rows, 0, self::MAX_ASSETS ),
 		);
@@ -55,9 +60,11 @@ final class SSC_Speed_Assets {
 	 */
 	public static function parse( $html ) {
 		$html       = (string) preg_replace( '~<!--.*?-->~s', '', (string) $html );
+		$emoji      = false !== strpos( $html, '_wpemojiSettings' );
 		$html       = (string) preg_replace( '~<noscript\b.*?</noscript>~is', '', $html );
 		$inline_css = 0;
 		$inline_js  = 0;
+		$fonts      = array();
 		// Inline code is measured and then removed, because it can contain text that looks like a tag.
 		$html = (string) preg_replace_callback(
 			'~(<script\b[^>]*>)(.*?)</script>~is',
@@ -69,8 +76,11 @@ final class SSC_Speed_Assets {
 		);
 		$html = (string) preg_replace_callback(
 			'~<style\b[^>]*>(.*?)</style>~is',
-			static function ( $m ) use ( &$inline_css ) {
+			static function ( $m ) use ( &$inline_css, &$fonts ) {
 				$inline_css += strlen( $m[1] );
+				if ( preg_match_all( '~@font-face\s*\{[^}]*?url\(\s*[\'"]?([^\'")\s]+\.woff2)~i', $m[1], $found ) ) {
+					$fonts = array_merge( $fonts, $found[1] );
+				}
 				return '';
 			},
 			$html
@@ -78,8 +88,12 @@ final class SSC_Speed_Assets {
 		$head_end = stripos( $html, '</head>' );
 		$assets   = array();
 		preg_match_all( '~<(link|script)\b[^>]*>~i', $html, $tags, PREG_OFFSET_CAPTURE );
+		$preloaded = array();
 		foreach ( $tags[0] as $i => $match ) {
 			$attrs   = self::attrs( $match[0] );
+			if ( 'preload' === strtolower( $attrs['rel'] ?? '' ) && 'font' === strtolower( $attrs['as'] ?? '' ) ) {
+				$preloaded[] = basename( (string) strtok( $attrs['href'] ?? '', '?#' ) );
+			}
 			$in_head = false === $head_end || $match[1] < $head_end;
 			$row     = 'link' === strtolower( $tags[1][ $i ][0] ) ? self::link_row( $attrs ) : self::script_row( $attrs, $in_head );
 			if ( $row && ! isset( $assets[ $row['url'] ] ) ) {
@@ -88,18 +102,54 @@ final class SSC_Speed_Assets {
 		}
 		$images = preg_match_all( '~<img\b[^>]*>~i', $html, $imgs );
 		$lazy   = 0;
+		$late   = 0;
 		foreach ( $imgs[0] as $img ) {
-			if ( 'lazy' === strtolower( self::attrs( $img )['loading'] ?? '' ) ) {
+			$a = self::attrs( $img );
+			if ( 'lazy' === strtolower( $a['loading'] ?? '' ) ) {
 				++$lazy;
+				$late += 'high' === strtolower( $a['fetchpriority'] ?? '' ) ? 1 : 0;
 			}
 		}
+		$fonts = array_filter(
+			array_unique( $fonts ),
+			static function ( $font ) use ( $preloaded ) {
+				return ! in_array( basename( (string) strtok( $font, '?#' ) ), $preloaded, true );
+			}
+		);
 		return array(
 			'assets'      => array_values( $assets ),
 			'inline_css'  => $inline_css,
 			'inline_js'   => $inline_js,
 			'images'      => (int) $images,
 			'lazy_images' => $lazy,
+			'priority_lazy' => $late,
+			'emoji'       => $emoji,
+			'fonts'       => array_values( $fonts ),
 		);
+	}
+
+	/** Font paths relative to the uploads folder. Rules can only preload fonts from there. */
+	private static function upload_fonts( array $fonts ) {
+		$base = (string) preg_replace( '~^https?:~', '', wp_get_upload_dir()['baseurl'] ) . '/';
+		$out  = array();
+		foreach ( $fonts as $font ) {
+			$bare = (string) preg_replace( '~^https?:~', '', (string) strtok( $font, '?#' ) );
+			if ( 0 === strpos( $bare, $base ) ) {
+				$out[] = substr( $bare, strlen( $base ) );
+			}
+		}
+		$out = array_values( array_unique( $out ) );
+		// Body text and headlines use these weights far more than any other, so they are the ones worth fetching early.
+		usort(
+			$out,
+			static function ( $a, $b ) {
+				$rank = static function ( $file ) {
+					return preg_match( '~regular|bold~i', basename( $file ) ) && ! preg_match( '~italic|semi|extra~i', basename( $file ) ) ? 0 : 1;
+				};
+				return $rank( $a ) <=> $rank( $b );
+			}
+		);
+		return $out;
 	}
 
 	private static function attrs( $tag ) {

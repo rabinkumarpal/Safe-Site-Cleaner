@@ -109,7 +109,7 @@ Without an API key, tests share Google's public quota and can be refused. A [fre
 
 ## Speed rules
 
-The **Speed** tab also holds rules that change how pages load for visitors. Each rule has its own switch, and turning one off undoes it right away. Rules are saved per site, so copy them to another site as JSON.
+The **Speed** tab also holds rules that change how pages load for visitors. Rules come from suggested fixes after a page check, or from a JSON import. Each rule has its own switch, and turning one off undoes it right away. Rules are saved per site, so copy them to another site as JSON.
 
 | Type | What it does | Fields |
 |---|---|---|
@@ -127,7 +127,30 @@ The **Speed** tab also holds rules that change how pages load for visitors. Each
 
 Rules stay off unless the JSON says `"enabled": true`, and importing a rule for the same files or handles replaces the old one. They don't run in the admin, on the login page, in the Customizer or in common page builders. To turn them off anywhere else, use the `ssc_speed_skip` filter.
 
-**The automatic page checks and rollback don't cover speed rules yet.** A rule can break a page and still pass those checks, so after turning one on, please test your pages and forms yourself. Delaying a script that other scripts depend on will break them.
+### Testing a rule before it goes live
+
+Low-risk fixes apply with one click, and fixes marked "compare first" show you both versions before you decide. Either way, the test works like this:
+
+| Step | What happens |
+|---|---|
+| Preview | Up to 3 pages load in frames at phone width, with and without the rule, through signed links that last 15 minutes. Visitors see nothing, and these loads are logged out and skip the page cache. |
+| Measure | A small script on those links reports script errors, failed files, forms, broken images, text length, page height, stuck stylesheets, delayed scripts that never started, LCP and CLS. It then simulates a first scroll, so delayed scripts run too. |
+| Decide | If anything got worse, you see what and the safe choice is to leave the rule off. |
+| Trial | Turning a rule on makes it live for up to 10 minutes. The server first compares its own copy of the page. |
+| Live check | The same pages load again as visitors now get them. If any got worse, the rule turns itself off. |
+| Finish | When the checks pass, the rule stays on. If you close the tab, it undoes itself within about 10 minutes, as soon as WordPress cron runs or you open the Speed tab. |
+
+The checks can't send a form, see visual details such as the wrong font, or test logged-in pages. They test only up to 3 pages, and one load on your computer is noisy, so please still try your forms and key pages. LCP and CLS need the page to paint, so they are compared only when the tab stayed in view for both loads. Otherwise they read as "Not measured" and only the other checks count. The on/off switch applies a rule straight away and skips all of this, as does `"enabled": true` in an import.
+
+### Profiles and recipes
+
+**Download profile** saves a site's rules as a file. On another site, **Check profile** shows what each rule would do there before anything changes, and imported rules start off unless you choose otherwise. Page exceptions travel as addresses, so they match the new site's pages.
+
+Recipes: `sureforms_unused`, `wp_emoji`, `jquery_migrate` and `dashicons_visitors`.
+
+### Effect of a cleanup on speed
+
+After a cleanup, the result shows the home page's size, files and blocking files, plus the settings loaded on every page, before and after. With an API key on a public site, it also shows Google's mobile score. Unused items often don't load on pages at all, so these numbers may not change.
 
 ## WP-CLI
 

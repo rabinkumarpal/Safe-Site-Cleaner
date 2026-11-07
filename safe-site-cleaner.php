@@ -2,7 +2,7 @@
 /**
  * Plugin Name:       Safe Site Cleaner
  * Description:       Finds unused plugins, media, leftovers and database bloat, and applies speed rules you can switch on and off. Checks real pages before and after, moves files to quarantine instead of deleting, and rolls back automatically if anything breaks.
- * Version:           1.2.0
+ * Version:           1.4.1
  * Requires at least: 5.9
  * Requires PHP:      7.4
  * Plugin URI:        https://github.com/rabinkumarpal/Safe-Site-Cleaner
@@ -14,7 +14,7 @@
 
 defined( 'ABSPATH' ) || exit;
 
-define( 'SSC_VERSION', '1.2.0' );
+define( 'SSC_VERSION', '1.4.1' );
 define( 'SSC_FILE', __FILE__ );
 define( 'SSC_DIR', plugin_dir_path( __FILE__ ) );
 define( 'SSC_SLUG', 'safe-site-cleaner' );
@@ -44,7 +44,8 @@ register_activation_hook(
 
 add_action( 'rest_api_init', array( 'SSC_Rest', 'register' ) );
 add_action( 'admin_menu', array( 'SSC_Admin', 'menu' ) );
-SSC_Speed::boot();
+// Signing preview links needs functions WordPress loads after the plugins' main files.
+add_action( 'plugins_loaded', array( 'SSC_Speed', 'boot' ), 1 );
 
 if ( defined( 'WP_CLI' ) && WP_CLI ) {
 	require_once SSC_DIR . 'includes/class-ssc-cli.php';

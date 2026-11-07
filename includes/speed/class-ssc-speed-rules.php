@@ -10,6 +10,11 @@ final class SSC_Speed_Rules {
 
 	const OPTION = 'ssc_speed_rules';
 	const MAX    = 200;
+	const TRIAL  = 'ssc_speed_trial';
+	const TRIAL_TIME = 600;
+
+	/** Rule IDs a signed preview link switches on or off, for that one request. */
+	private static $force = array( 'on' => array(), 'off' => array() );
 
 	const WHAT = array(
 		'preload_font'      => 'Fetches these fonts early, so headlines do not wait behind the page\'s other files.',
@@ -24,29 +29,110 @@ final class SSC_Speed_Rules {
 		return is_array( $rules ) ? array_values( $rules ) : array();
 	}
 
+	public static function force( array $on, array $off ) {
+		self::$force = array( 'on' => $on, 'off' => $off );
+	}
+
 	/** Enabled rules, optionally of one type. */
 	public static function enabled( $type = null ) {
+		$force = self::$force;
 		return array_values(
 			array_filter(
 				self::all(),
-				static function ( $r ) use ( $type ) {
-					return ! empty( $r['enabled'] ) && ( null === $type || $type === $r['type'] );
+				static function ( $r ) use ( $type, $force ) {
+					$on = in_array( $r['id'], $force['on'], true ) || ( ! empty( $r['enabled'] ) && ! in_array( $r['id'], $force['off'], true ) );
+					return $on && ( null === $type || $type === $r['type'] );
 				}
 			)
 		);
+	}
+
+	public static function has( array $ids ) {
+		return ! array_diff( $ids, array_column( self::all(), 'id' ) );
+	}
+
+	/** The running trial. One past its time undoes itself here, so a closed tab can't leave it on. */
+	public static function trial() {
+		$trial = get_option( self::TRIAL );
+		if ( ! is_array( $trial ) ) {
+			return null;
+		}
+		if ( $trial['expires'] < time() ) {
+			self::undo_trial();
+			return null;
+		}
+		return $trial;
+	}
+
+	/**
+	 * Turns rules on for a limited time, unless the server's own check of the page gets worse.
+	 *
+	 * @return string[] Problems. When there are any, the rules were put back.
+	 */
+	public static function start_trial( array $ids, $url ) {
+		if ( self::trial() ) {
+			throw new RuntimeException( 'Another test is still running. Finish it first.' );
+		}
+		if ( ! $ids || ! self::has( $ids ) ) {
+			throw new InvalidArgumentException( 'Unknown rule.' );
+		}
+		$rules = self::all();
+		$was   = array();
+		foreach ( $rules as &$r ) {
+			if ( in_array( $r['id'], $ids, true ) ) {
+				$was[ $r['id'] ] = ! empty( $r['enabled'] );
+				$r['enabled']    = true;
+			}
+		}
+		unset( $r );
+		$before = array( $url => SSC_SiteCheck::fetch_page( $url ) );
+		self::save( $rules );
+		$after    = array( $url => SSC_SiteCheck::fetch_page( $url ) );
+		$problems = SSC_SiteCheck::compare( $before, $after, array(), array(), array() );
+		update_option( self::TRIAL, array( 'was' => $was, 'expires' => time() + self::TRIAL_TIME ), false );
+		if ( $problems ) {
+			self::undo_trial();
+			return $problems;
+		}
+		wp_schedule_single_event( time() + self::TRIAL_TIME + 5, 'ssc_speed_trial_end' );
+		return array();
+	}
+
+	public static function keep_trial() {
+		delete_option( self::TRIAL );
+		wp_clear_scheduled_hook( 'ssc_speed_trial_end' );
+	}
+
+	public static function undo_trial() {
+		$trial = get_option( self::TRIAL );
+		if ( ! is_array( $trial ) ) {
+			return;
+		}
+		$rules = self::all();
+		foreach ( $rules as &$r ) {
+			if ( isset( $trial['was'][ $r['id'] ] ) ) {
+				$r['enabled'] = $trial['was'][ $r['id'] ];
+			}
+		}
+		unset( $r );
+		delete_option( self::TRIAL );
+		wp_clear_scheduled_hook( 'ssc_speed_trial_end' );
+		self::save( $rules );
 	}
 
 	/**
 	 * Adds rules, replacing any with the same target. Nothing is saved if any row is invalid.
 	 *
 	 * @param array $rows Raw rules.
-	 * @return int Rules imported.
+	 * @return array IDs imported, and which of them are new.
 	 */
 	public static function import( array $rows ) {
 		$by_id = array();
 		foreach ( self::all() as $r ) {
 			$by_id[ $r['id'] ] = $r;
 		}
+		$ids     = array();
+		$created = array();
 		foreach ( $rows as $i => $row ) {
 			if ( ! is_array( $row ) ) {
 				throw new InvalidArgumentException( 'Rule ' . ( $i + 1 ) . ' is not a rule.' );
@@ -56,13 +142,17 @@ final class SSC_Speed_Rules {
 			} catch ( InvalidArgumentException $e ) {
 				throw new InvalidArgumentException( 'Rule ' . ( $i + 1 ) . ': ' . $e->getMessage() );
 			}
+			$ids[] = $rule['id'];
+			if ( ! isset( $by_id[ $rule['id'] ] ) ) {
+				$created[] = $rule['id'];
+			}
 			$by_id[ $rule['id'] ] = $rule;
 		}
 		if ( count( $by_id ) > self::MAX ) {
 			throw new InvalidArgumentException( 'Too many rules. The limit is ' . self::MAX . '.' );
 		}
 		self::save( array_values( $by_id ) );
-		return count( $rows );
+		return array( 'ids' => $ids, 'created' => $created );
 	}
 
 	public static function set_enabled( $id, $on ) {
@@ -101,7 +191,7 @@ final class SSC_Speed_Rules {
 	public static function view() {
 		return array_map(
 			static function ( $r ) {
-				$r['what']    = self::WHAT[ $r['type'] ];
+				$r['what']    = self::what( $r );
 				$r['problem'] = self::problem( $r );
 				return $r;
 			},
@@ -109,8 +199,17 @@ final class SSC_Speed_Rules {
 		);
 	}
 
+	public static function what( array $rule ) {
+		return 'recipe' === $rule['type'] ? SSC_Speed_Recipes::what( $rule['recipe'] ) : self::WHAT[ $rule['type'] ];
+	}
+
+	/** A page by its address relative to the home page, such as /contact/. */
+	public static function page_for_path( $path ) {
+		return (int) url_to_postid( home_url( '/' . ltrim( $path, '/' ) ) );
+	}
+
 	/** Only what can be known from the admin side. Handles exist only while a page renders. */
-	private static function problem( array $r ) {
+	public static function problem( array $r ) {
 		if ( 'preload_font' === $r['type'] ) {
 			$dir = wp_get_upload_dir()['basedir'];
 			foreach ( $r['files'] as $file ) {
@@ -131,7 +230,7 @@ final class SSC_Speed_Rules {
 		SSC_Store::flush_caches();
 	}
 
-	private static function clean( array $row ) {
+	public static function clean( array $row ) {
 		$type = (string) ( $row['type'] ?? '' );
 		if ( ! isset( self::WHAT[ $type ] ) ) {
 			throw new InvalidArgumentException( 'Unknown type "' . sanitize_text_field( $type ) . '".' );
@@ -150,7 +249,9 @@ final class SSC_Speed_Rules {
 				break;
 			case 'defer_style':
 				$rule['handles']      = self::handles( $row['handles'] ?? null );
-				$rule['except_pages'] = array_values( array_unique( array_filter( array_map( 'absint', (array) ( $row['except_pages'] ?? array() ) ) ) ) );
+				// Profiles carry addresses, because page IDs differ between sites.
+				$paths                = array_map( array( __CLASS__, 'page_for_path' ), array_map( 'strval', (array) ( $row['except_paths'] ?? array() ) ) );
+				$rule['except_pages'] = array_values( array_unique( array_filter( array_merge( array_map( 'absint', (array) ( $row['except_pages'] ?? array() ) ), $paths ) ) ) );
 				$key                  = implode( ',', $rule['handles'] );
 				break;
 			case 'delay_script':

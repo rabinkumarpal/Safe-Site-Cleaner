@@ -8,14 +8,21 @@ defined( 'ABSPATH' ) || exit;
 
 final class SSC_Speed {
 
+	const PREVIEW      = 'ssc_speed_preview';
+	const PREVIEW_TIME = 900;
+
 	private static $skip = null;
 	private static $deferred = null;
 	private static $delayed = array();
 
 	public static function boot() {
 		SSC_Speed_Recipes::watch();
+		add_action( 'ssc_speed_trial_end', array( 'SSC_Speed_Rules', 'trial' ) );
 		if ( is_admin() || 'wp-login.php' === ( $GLOBALS['pagenow'] ?? '' ) ) {
 			return;
+		}
+		if ( isset( $_GET[ self::PREVIEW ] ) ) { // phpcs:ignore WordPress.Security.NonceVerification
+			self::start_preview( (string) $_GET[ self::PREVIEW ] ); // phpcs:ignore WordPress.Security.NonceVerification,WordPress.Security.ValidatedSanitizedInput
 		}
 		$rules = SSC_Speed_Rules::enabled();
 		if ( ! $rules ) {
@@ -43,6 +50,56 @@ final class SSC_Speed {
 		foreach ( SSC_Speed_Rules::enabled( 'recipe' ) as $rule ) {
 			SSC_Speed_Recipes::start( $rule['recipe'] );
 		}
+	}
+
+	/**
+	 * A link that shows a page as a logged-out visitor would see it, with these rules forced on or off.
+	 * It is signed and short-lived, and it can't do more than choose between the site's own rules.
+	 */
+	public static function preview_url( $url, array $on, array $off ) {
+		$payload = rtrim( strtr( base64_encode( (string) wp_json_encode( array( 'on' => $on, 'off' => $off, 'exp' => time() + self::PREVIEW_TIME ) ) ), '+/', '-_' ), '=' );
+		return add_query_arg(
+			array(
+				self::PREVIEW => $payload . '.' . hash_hmac( 'sha256', $payload, wp_salt( 'nonce' ) ),
+				'ssc_r'       => wp_rand(),
+			),
+			$url
+		);
+	}
+
+	/** @return array|null The link's rule choices, or null if it isn't genuine or has expired. */
+	public static function read_preview( $token ) {
+		$parts = explode( '.', $token );
+		if ( 2 !== count( $parts ) || ! hash_equals( hash_hmac( 'sha256', $parts[0], wp_salt( 'nonce' ) ), $parts[1] ) ) {
+			return null;
+		}
+		$data = json_decode( (string) base64_decode( strtr( $parts[0], '-_', '+/' ) ), true );
+		return is_array( $data ) && ( $data['exp'] ?? 0 ) >= time() ? $data : null;
+	}
+
+	private static function start_preview( $token ) {
+		$data = self::read_preview( $token );
+		if ( ! $data ) {
+			return;
+		}
+		SSC_Speed_Rules::force( array_map( 'strval', (array) $data['on'] ), array_map( 'strval', (array) $data['off'] ) );
+		add_filter( 'determine_current_user', '__return_zero', PHP_INT_MAX );
+		add_action( 'wp_head', array( __CLASS__, 'print_probe' ), -1000 );
+		if ( ! defined( 'DONOTCACHEPAGE' ) ) {
+			define( 'DONOTCACHEPAGE', true );
+		}
+		do_action( 'litespeed_control_set_nocache', 'Safe Site Cleaner preview' );
+		add_action(
+			'send_headers',
+			static function () {
+				nocache_headers();
+				header( 'X-Robots-Tag: noindex, nofollow' );
+			}
+		);
+	}
+
+	public static function print_probe() {
+		echo '<script>' . file_get_contents( SSC_DIR . 'assets/speed-probe.js' ) . "</script>\n"; // phpcs:ignore WordPress.Security.EscapeOutput,WordPress.WP.AlternativeFunctions
 	}
 
 	/** True where rules must stay out of the way: page builders and the Customizer. */

@@ -32,7 +32,8 @@ final class SSC_Admin {
 					)
 				);
 				if ( 'speed' === self::tab() ) {
-					wp_enqueue_script( SSC_SLUG . '-speed-check', plugins_url( 'assets/speed-check.js', SSC_FILE ), array( SSC_SLUG ), SSC_VERSION, true );
+					wp_enqueue_script( SSC_SLUG . '-speed-try', plugins_url( 'assets/speed-try.js', SSC_FILE ), array( SSC_SLUG ), SSC_VERSION, true );
+					wp_enqueue_script( SSC_SLUG . '-speed-check', plugins_url( 'assets/speed-check.js', SSC_FILE ), array( SSC_SLUG . '-speed-try' ), SSC_VERSION, true );
 					wp_enqueue_script( SSC_SLUG . '-speed', plugins_url( 'assets/speed.js', SSC_FILE ), array( SSC_SLUG . '-speed-check' ), SSC_VERSION, true );
 				}
 				if ( 'settings' === self::tab() ) {

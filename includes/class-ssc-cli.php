@@ -144,6 +144,11 @@ final class SSC_CLI {
 			WP_CLI::warning( $p );
 		}
 		if ( 'applied' === $v['outcome'] ) {
+			$b = (array) $v['speed_before'];
+			$a = (array) $v['speed_after'];
+			if ( isset( $b['bytes'], $a['bytes'] ) ) {
+				WP_CLI::log( sprintf( 'Home page: %s to %s, %d to %d files. Settings loaded on every page: %s to %s.', size_format( $b['bytes'] ), size_format( $a['bytes'] ), $b['files'], $a['files'], size_format( $b['autoload_bytes'] ), size_format( $a['autoload_bytes'] ) ) );
+			}
 			WP_CLI::success( 'Cleaned and verified. Logged-in admin screens were not checked from the command line.' );
 		} elseif ( 'rolled_back' === $v['outcome'] ) {
 			WP_CLI::warning( 'Problems were found, so everything was rolled back.' );

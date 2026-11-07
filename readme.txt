@@ -1,7 +1,7 @@
 === Safe Site Cleaner ===
 Requires at least: 5.9
 Requires PHP: 7.4
-Stable tag: 1.2.0
+Stable tag: 1.4.1
 License: GPL-2.0-or-later
 
 Finds unused plugins, media, leftovers and database bloat, then proves the site still works.
@@ -36,8 +36,9 @@ to get one. A free Google API key is optional and avoids the shared quota.
 
 The Speed tab also holds rules you switch on and off: preload fonts, stop the main image lazy-loading,
 defer stylesheets, delay scripts, and drop assets for unused SureForms Pro features. Rules are saved
-per site and can be copied to another site as JSON. The automatic page checks and rollback do not
-cover them yet, so please test your pages and forms after turning one on.
+per site and can be copied to another site as JSON. A page check suggests fixes. Each one is tested on
+up to 3 real pages through signed preview links that visitors never see, then goes live as a trial
+and undoes itself if a page gets worse. These checks cannot send a form, so please try your forms.
 
 == Limits ==
 
