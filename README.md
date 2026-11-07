@@ -94,6 +94,28 @@ Under **Past cleanups**, click **Restore or delete**:
 - Restoring the database also restores login sessions, so if you signed in after the backup, you'll need to sign in again.
 - **Delete permanently** needs you to type `DELETE`, or `DELETE NOW` within 24 hours of the cleanup. This frees the disk space and **cannot be undone**. The database backup is kept unless you choose to delete it too.
 
+## Speed rules
+
+The **Speed** tab holds rules that change how pages load for visitors. Each rule has its own switch, and turning one off undoes it right away. Rules are saved per site, so copy them to another site as JSON.
+
+| Type | What it does | Fields |
+|---|---|---|
+| `preload_font` | Fetches fonts early | `files`: `.woff` or `.woff2` paths inside uploads |
+| `eager_first_image` | Stops a page builder lazy-loading the image WordPress marks as highest priority | None |
+| `defer_style` | Loads stylesheets without holding up the first paint | `handles`, optional `except_pages` (page IDs) |
+| `delay_script` | Loads scripts on the visitor's first scroll, pointer, touch, key or focus | `handles` |
+| `recipe` | Drops assets a plugin loads for features the site doesn't use | `recipe`: `sureforms_unused` |
+
+```json
+[
+  { "type": "delay_script", "label": "Delay captcha", "handles": ["hcaptcha"], "enabled": true }
+]
+```
+
+Rules stay off unless the JSON says `"enabled": true`, and importing a rule for the same files or handles replaces the old one. They don't run in the admin, on the login page, in the Customizer or in common page builders. To turn them off anywhere else, use the `ssc_speed_skip` filter.
+
+**The automatic page checks and rollback don't cover speed rules yet.** A rule can break a page and still pass those checks, so after turning one on, please test your pages and forms yourself. Delaying a script that other scripts depend on will break them.
+
 ## WP-CLI
 
 ```bash

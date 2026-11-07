@@ -16,6 +16,10 @@ final class SSC_Rest {
 			array( 'apply', 'POST', 'apply' ),
 			array( 'restore', 'POST', 'restore' ),
 			array( 'purge', 'POST', 'purge' ),
+			array( 'speed', 'GET', 'speed' ),
+			array( 'speed/toggle', 'POST', 'speed_toggle' ),
+			array( 'speed/delete', 'POST', 'speed_delete' ),
+			array( 'speed/import', 'POST', 'speed_import' ),
 		);
 		foreach ( $routes as $r ) {
 			register_rest_route(
@@ -97,5 +101,37 @@ final class SSC_Rest {
 		$run   = self::run_id( $r );
 		$freed = SSC_Engine::purge( $run, (string) $r->get_param( 'phrase' ), (bool) $r->get_param( 'include_backup' ) );
 		return array( 'freed' => $freed, 'run' => SSC_Engine::view( $run ) );
+	}
+
+	private static function speed( WP_REST_Request $r ) {
+		return array( 'rules' => SSC_Speed_Rules::view() );
+	}
+
+	/** A rule changing mid-cleanup would show up in the before-and-after check as damage. */
+	private static function assert_no_cleanup() {
+		if ( SSC_Engine::active_run() ) {
+			throw new RuntimeException( 'A cleanup job is running. Wait for it to finish, then change speed rules.' );
+		}
+	}
+
+	private static function speed_toggle( WP_REST_Request $r ) {
+		self::assert_no_cleanup();
+		SSC_Speed_Rules::set_enabled( (string) $r->get_param( 'id' ), (bool) $r->get_param( 'enabled' ) );
+		return array( 'rules' => SSC_Speed_Rules::view() );
+	}
+
+	private static function speed_delete( WP_REST_Request $r ) {
+		self::assert_no_cleanup();
+		SSC_Speed_Rules::delete( (string) $r->get_param( 'id' ) );
+		return array( 'rules' => SSC_Speed_Rules::view() );
+	}
+
+	private static function speed_import( WP_REST_Request $r ) {
+		self::assert_no_cleanup();
+		$rows = $r->get_param( 'rules' );
+		if ( ! is_array( $rows ) ) {
+			throw new InvalidArgumentException( 'No rules to import.' );
+		}
+		return array( 'imported' => SSC_Speed_Rules::import( $rows ), 'rules' => SSC_Speed_Rules::view() );
 	}
 }

@@ -300,5 +300,6 @@
 		);
 	}
 
-	load();
+	window.SSCUI = { el: el, api: api, box: box, show: show };
+	if (SSC.tab !== 'speed') { load(); }
 }());

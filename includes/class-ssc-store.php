@@ -11,6 +11,16 @@ final class SSC_Store {
 	const OPTION = 'ssc_data_dir';
 
 	/** Folder for backups and quarantine. Outside the web root whenever the host allows it. */
+	/** Clears the object cache and any known page cache. */
+	public static function flush_caches() {
+		wp_cache_flush();
+		do_action( 'litespeed_purge_all' );
+		do_action( 'w3tc_flush_all' );
+		if ( function_exists( 'rocket_clean_domain' ) ) {
+			rocket_clean_domain();
+		}
+	}
+
 	public static function data_dir() {
 		$dir = get_option( self::OPTION );
 		if ( is_string( $dir ) && '' !== $dir && is_dir( $dir ) && is_writable( $dir ) ) {

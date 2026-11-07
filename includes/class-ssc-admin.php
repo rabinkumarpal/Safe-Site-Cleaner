@@ -27,16 +27,30 @@ final class SSC_Admin {
 					array(
 						'root'  => esc_url_raw( rest_url( SSC_Rest::NS . '/' ) ),
 						'nonce' => wp_create_nonce( 'wp_rest' ),
+						'tab'   => self::tab(),
 					)
 				);
+				if ( 'speed' === self::tab() ) {
+					wp_enqueue_script( SSC_SLUG . '-speed', plugins_url( 'assets/speed.js', SSC_FILE ), array( SSC_SLUG ), SSC_VERSION, true );
+				}
 			}
 		);
+	}
+
+	private static function tab() {
+		return isset( $_GET['tab'] ) && 'speed' === $_GET['tab'] ? 'speed' : 'clean'; // phpcs:ignore WordPress.Security.NonceVerification
 	}
 
 	public static function render() {
 		if ( ! current_user_can( 'manage_options' ) ) {
 			return;
 		}
-		echo '<div class="wrap ssc"><h1>' . esc_html__( 'Safe Site Cleaner', 'safe-site-cleaner' ) . '</h1><div id="ssc-app"><p>' . esc_html__( 'Loading…', 'safe-site-cleaner' ) . '</p></div></div>';
+		$url = admin_url( 'tools.php?page=' . SSC_SLUG );
+		echo '<div class="wrap ssc"><h1>' . esc_html__( 'Safe Site Cleaner', 'safe-site-cleaner' ) . '</h1>';
+		echo '<nav class="nav-tab-wrapper">';
+		printf( '<a class="nav-tab%s" href="%s">%s</a>', 'clean' === self::tab() ? ' nav-tab-active' : '', esc_url( $url ), esc_html__( 'Clean', 'safe-site-cleaner' ) );
+		printf( '<a class="nav-tab%s" href="%s">%s</a>', 'speed' === self::tab() ? ' nav-tab-active' : '', esc_url( $url . '&tab=speed' ), esc_html__( 'Speed', 'safe-site-cleaner' ) );
+		echo '</nav>';
+		echo '<div id="ssc-app"><p>' . esc_html__( 'Loading…', 'safe-site-cleaner' ) . '</p></div></div>';
 	}
 }

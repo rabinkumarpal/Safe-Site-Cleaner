@@ -518,12 +518,7 @@ final class SSC_Engine {
 	}
 
 	private static function step_flush( array &$s, $run, $deadline ) {
-		wp_cache_flush();
-		do_action( 'litespeed_purge_all' );
-		do_action( 'w3tc_flush_all' );
-		if ( function_exists( 'rocket_clean_domain' ) ) {
-			rocket_clean_domain();
-		}
+		SSC_Store::flush_caches();
 		return true;
 	}
 

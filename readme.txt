@@ -1,7 +1,7 @@
 === Safe Site Cleaner ===
 Requires at least: 5.9
 Requires PHP: 7.4
-Stable tag: 1.0.0
+Stable tag: 1.1.0
 License: GPL-2.0-or-later
 
 Finds unused plugins, media, leftovers and database bloat, then proves the site still works.
@@ -24,6 +24,13 @@ Finds unused plugins, media, leftovers and database bloat, then proves the site 
 * wp-config.php, WordPress core
 * Documents (PDFs and so on), and form upload folders
 * Tables whose names suggest legal or business records, and tables with no known owner
+
+== Speed rules ==
+
+The Speed tab holds rules you switch on and off: preload fonts, stop the main image lazy-loading,
+defer stylesheets, delay scripts, and drop assets for unused SureForms Pro features. Rules are saved
+per site and can be copied to another site as JSON. The automatic page checks and rollback do not
+cover them yet, so please test your pages and forms after turning one on.
 
 == Limits ==
 
