@@ -1,7 +1,7 @@
 === Safe Site Cleaner ===
 Requires at least: 5.9
 Requires PHP: 7.4
-Stable tag: 1.1.0
+Stable tag: 1.2.0
 License: GPL-2.0-or-later
 
 Finds unused plugins, media, leftovers and database bloat, then proves the site still works.
@@ -25,9 +25,16 @@ Finds unused plugins, media, leftovers and database bloat, then proves the site 
 * Documents (PDFs and so on), and form upload folders
 * Tables whose names suggest legal or business records, and tables with no known owner
 
+== Check a page ==
+
+The Speed tab shows a page's mobile and desktop score from Google PageSpeed Insights, what each plugin
+adds to the page, and every CSS and JavaScript file with its size and how it loads. Checking changes
+nothing. Sending a page address to Google is how the score is measured, so the site must be public
+to get one. A free Google API key is optional and avoids the shared quota.
+
 == Speed rules ==
 
-The Speed tab holds rules you switch on and off: preload fonts, stop the main image lazy-loading,
+The Speed tab also holds rules you switch on and off: preload fonts, stop the main image lazy-loading,
 defer stylesheets, delay scripts, and drop assets for unused SureForms Pro features. Rules are saved
 per site and can be copied to another site as JSON. The automatic page checks and rollback do not
 cover them yet, so please test your pages and forms after turning one on.

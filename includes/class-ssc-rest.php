@@ -20,7 +20,17 @@ final class SSC_Rest {
 			array( 'speed/toggle', 'POST', 'speed_toggle' ),
 			array( 'speed/delete', 'POST', 'speed_delete' ),
 			array( 'speed/import', 'POST', 'speed_import' ),
+			array( 'speed/pages', 'GET', 'speed_pages' ),
+			array( 'speed/result', 'GET', 'speed_result' ),
+			array( 'speed/scan', 'POST', 'speed_scan' ),
+			array( 'speed/psi', 'POST', 'speed_psi' ),
+			array( 'speed/key', 'POST', 'speed_key' ),
+			array( 'speed/key-test', 'POST', 'speed_key_test' ),
 		);
+		// These only ever run for this API, so visitors' page loads don't pay for them.
+		require_once SSC_DIR . 'includes/speed/class-ssc-speed-assets.php';
+		require_once SSC_DIR . 'includes/speed/class-ssc-speed-psi.php';
+		require_once SSC_DIR . 'includes/speed/class-ssc-speed-results.php';
 		foreach ( $routes as $r ) {
 			register_rest_route(
 				self::NS,
@@ -133,5 +143,40 @@ final class SSC_Rest {
 			throw new InvalidArgumentException( 'No rules to import.' );
 		}
 		return array( 'imported' => SSC_Speed_Rules::import( $rows ), 'rules' => SSC_Speed_Rules::view() );
+	}
+
+	private static function speed_pages( WP_REST_Request $r ) {
+		$home = home_url( '/' );
+		return array(
+			'pages'     => SSC_Speed_Results::pages(),
+			'has_key'   => SSC_Speed_Psi::has_key(),
+			'reachable' => SSC_Speed_Psi::reachable( $home ),
+		);
+	}
+
+	private static function speed_result( WP_REST_Request $r ) {
+		$url = SSC_Speed_Results::page_url( $r->get_param( 'url' ) );
+		return array( 'url' => $url, 'page' => SSC_Speed_Results::get( $url ) );
+	}
+
+	private static function speed_scan( WP_REST_Request $r ) {
+		$url = SSC_Speed_Results::page_url( $r->get_param( 'url' ) );
+		return array( 'url' => $url, 'page' => SSC_Speed_Results::save_assets( $url, SSC_Speed_Assets::scan( $url ) ) );
+	}
+
+	private static function speed_psi( WP_REST_Request $r ) {
+		$url      = SSC_Speed_Results::page_url( $r->get_param( 'url' ) );
+		$strategy = 'desktop' === $r->get_param( 'strategy' ) ? 'desktop' : 'mobile';
+		return array( 'url' => $url, 'page' => SSC_Speed_Results::save_psi( $url, $strategy, SSC_Speed_Psi::run( $url, $strategy ) ) );
+	}
+
+	private static function speed_key( WP_REST_Request $r ) {
+		SSC_Speed_Psi::save_key( $r->get_param( 'key' ) );
+		return array( 'has_key' => SSC_Speed_Psi::has_key() );
+	}
+
+	private static function speed_key_test( WP_REST_Request $r ) {
+		SSC_Speed_Psi::test_key();
+		return array( 'ok' => true );
 	}
 }

@@ -65,9 +65,10 @@
 	}
 
 	function render(rules, note) {
-		if (!rules) { show(note, el('button', { class: 'button', on: { click: function () { load(); } } }, 'Back')); return; }
+		if (!rules) { show(note, ui.speedCheck.host, el('button', { class: 'button', on: { click: function () { load(); } } }, 'Back')); return; }
 		show(
 			note,
+			ui.speedCheck.host,
 			el('div', { class: 'card' }, [
 				el('h2', {}, 'Speed rules'),
 				el('p', { class: 'muted' }, 'Each rule changes how pages load for visitors, and only while its switch is on. Turning one off undoes it right away. Automatic checks do not cover these rules yet, so after a change please try your pages and forms yourself.'),
@@ -77,5 +78,6 @@
 		);
 	}
 
+	ui.speedCheck.start();
 	load();
 }());

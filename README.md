@@ -94,9 +94,22 @@ Under **Past cleanups**, click **Restore or delete**:
 - Restoring the database also restores login sessions, so if you signed in after the backup, you'll need to sign in again.
 - **Delete permanently** needs you to type `DELETE`, or `DELETE NOW` within 24 hours of the cleanup. This frees the disk space and **cannot be undone**. The database backup is kept unless you choose to delete it too.
 
+## Check a page
+
+The **Speed** tab shows how fast a page is and what is slowing it down. Checking changes nothing on your site, and it adds no code to your front end.
+
+- **Speed score:** mobile and desktop scores, lab measures and suggestions from Google PageSpeed Insights, plus real-visitor numbers when Google has them. Google has to be able to reach the site, so local sites and sites behind a login get no score.
+- **Page weight:** files, blocking files, CSS, JavaScript, third-party files, HTML size and uncached server response.
+- **What each plugin adds:** the size of the files each plugin, theme or other site adds to the page.
+- **File list:** each CSS and JavaScript file, who it belongs to, how it loads and how big it is.
+
+File sizes are measured on disk before compression, so they are higher than what visitors download. A `~` means the server reported the size instead, and third-party files are usually measured that way.
+
+Without an API key, tests share Google's public quota and can be refused. A [free key](https://developers.google.com/speed/docs/insights/v5/get-started) gives you your own: paste it in the **Settings** tab, where you can also test it. If the plugin wrongly decides Google can't reach your site, use the `ssc_speed_psi_reachable` filter.
+
 ## Speed rules
 
-The **Speed** tab holds rules that change how pages load for visitors. Each rule has its own switch, and turning one off undoes it right away. Rules are saved per site, so copy them to another site as JSON.
+The **Speed** tab also holds rules that change how pages load for visitors. Each rule has its own switch, and turning one off undoes it right away. Rules are saved per site, so copy them to another site as JSON.
 
 | Type | What it does | Fields |
 |---|---|---|

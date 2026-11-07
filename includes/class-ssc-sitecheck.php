@@ -80,6 +80,17 @@ final class SSC_SiteCheck {
 		);
 	}
 
+	/** A page as a logged-out visitor gets it, for reading rather than comparing. */
+	public static function fetch_html( $url ) {
+		$start = microtime( true );
+		$res   = wp_remote_get( add_query_arg( 'ssc_check', wp_rand(), self::encode( $url ) ), self::args() );
+		$ms    = (int) round( ( microtime( true ) - $start ) * 1000 );
+		if ( is_wp_error( $res ) ) {
+			return array( 'status' => 0, 'body' => '', 'ms' => $ms, 'error' => $res->get_error_message() );
+		}
+		return array( 'status' => (int) wp_remote_retrieve_response_code( $res ), 'body' => wp_remote_retrieve_body( $res ), 'ms' => $ms, 'error' => '' );
+	}
+
 	public static function fetch_page( $url ) {
 		$bust = add_query_arg( 'ssc_check', wp_rand(), self::encode( $url ) );
 		$res  = wp_remote_get( $bust, self::args() );

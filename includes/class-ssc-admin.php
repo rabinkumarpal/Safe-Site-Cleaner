@@ -28,17 +28,23 @@ final class SSC_Admin {
 						'root'  => esc_url_raw( rest_url( SSC_Rest::NS . '/' ) ),
 						'nonce' => wp_create_nonce( 'wp_rest' ),
 						'tab'   => self::tab(),
+						'page'  => admin_url( 'tools.php?page=' . SSC_SLUG ),
 					)
 				);
 				if ( 'speed' === self::tab() ) {
-					wp_enqueue_script( SSC_SLUG . '-speed', plugins_url( 'assets/speed.js', SSC_FILE ), array( SSC_SLUG ), SSC_VERSION, true );
+					wp_enqueue_script( SSC_SLUG . '-speed-check', plugins_url( 'assets/speed-check.js', SSC_FILE ), array( SSC_SLUG ), SSC_VERSION, true );
+					wp_enqueue_script( SSC_SLUG . '-speed', plugins_url( 'assets/speed.js', SSC_FILE ), array( SSC_SLUG . '-speed-check' ), SSC_VERSION, true );
+				}
+				if ( 'settings' === self::tab() ) {
+					wp_enqueue_script( SSC_SLUG . '-settings', plugins_url( 'assets/settings.js', SSC_FILE ), array( SSC_SLUG ), SSC_VERSION, true );
 				}
 			}
 		);
 	}
 
 	private static function tab() {
-		return isset( $_GET['tab'] ) && 'speed' === $_GET['tab'] ? 'speed' : 'clean'; // phpcs:ignore WordPress.Security.NonceVerification
+		$tab = isset( $_GET['tab'] ) ? sanitize_key( $_GET['tab'] ) : ''; // phpcs:ignore WordPress.Security.NonceVerification
+		return in_array( $tab, array( 'speed', 'settings' ), true ) ? $tab : 'clean';
 	}
 
 	public static function render() {
@@ -48,8 +54,14 @@ final class SSC_Admin {
 		$url = admin_url( 'tools.php?page=' . SSC_SLUG );
 		echo '<div class="wrap ssc"><h1>' . esc_html__( 'Safe Site Cleaner', 'safe-site-cleaner' ) . '</h1>';
 		echo '<nav class="nav-tab-wrapper">';
-		printf( '<a class="nav-tab%s" href="%s">%s</a>', 'clean' === self::tab() ? ' nav-tab-active' : '', esc_url( $url ), esc_html__( 'Clean', 'safe-site-cleaner' ) );
-		printf( '<a class="nav-tab%s" href="%s">%s</a>', 'speed' === self::tab() ? ' nav-tab-active' : '', esc_url( $url . '&tab=speed' ), esc_html__( 'Speed', 'safe-site-cleaner' ) );
+		$tabs = array(
+			'clean'    => array( $url, __( 'Clean', 'safe-site-cleaner' ) ),
+			'speed'    => array( $url . '&tab=speed', __( 'Speed', 'safe-site-cleaner' ) ),
+			'settings' => array( $url . '&tab=settings', __( 'Settings', 'safe-site-cleaner' ) ),
+		);
+		foreach ( $tabs as $key => $tab ) {
+			printf( '<a class="nav-tab%s" href="%s">%s</a>', $key === self::tab() ? ' nav-tab-active' : '', esc_url( $tab[0] ), esc_html( $tab[1] ) );
+		}
 		echo '</nav>';
 		echo '<div id="ssc-app"><p>' . esc_html__( 'Loading…', 'safe-site-cleaner' ) . '</p></div></div>';
 	}
