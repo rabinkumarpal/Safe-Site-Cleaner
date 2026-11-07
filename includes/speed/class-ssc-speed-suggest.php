@@ -16,12 +16,12 @@ final class SSC_Speed_Suggest {
 	 * @param array $scan A result from SSC_Speed_Assets::scan().
 	 * @return array Fixes and advice.
 	 */
-	public static function build( array $scan ) {
+	public static function build( array $scan, $lcp = null ) {
 		$covered = self::covered();
 		$rows    = $scan['assets'] ?? array();
 		$hints   = $scan['hints'] ?? array();
 		$out     = array();
-		$others  = SSC_Speed_Others::active();
+		$others  = SSC_Speed_Others::active( $rows );
 		$taken   = array();
 		// A fix another plugin already does is left out and named instead, so two plugins don't fight.
 		$offer = static function ( array $fix ) use ( &$out, &$taken, $others ) {
@@ -61,9 +61,38 @@ final class SSC_Speed_Suggest {
 		if ( $icons ) {
 			$offer( self::fix( 'test', 'Load icon and web fonts without holding up the page', 'These stylesheets block the first paint. Text can show before they arrive, though it may flash or shift, so compare before applying.', array( 'type' => 'defer_style', 'label' => 'Defer icon and web font CSS', 'handles' => $icons ) ) );
 		}
+		// Stylesheets from other sites that block the first paint, such as review or booking widgets.
+		$third = array();
+		foreach ( $rows as $r ) {
+			if ( 'css' === $r['kind'] && $r['third_party'] && 'blocking' === $r['state'] && $r['handle'] && ! in_array( $r['handle'], $covered['handles'], true ) && ! in_array( $r['handle'], $icons, true )
+				&& preg_match( '~^[A-Za-z0-9_.-]{1,100}$~', $r['handle'] ) ) {
+				$third[ $r['handle'] ] = $r['owner'];
+			}
+		}
+		if ( $third ) {
+			$offer( self::fix( 'test', 'Load stylesheets from ' . implode( ', ', array_unique( $third ) ) . ' without holding up the page', 'Another site\'s stylesheet blocks the first paint, and every visitor waits for that site\'s server. If what it styles is further down the page, it can load later. If the plugin that adds it changes its settings, the stylesheet\'s name can change and this rule then stops matching.', array( 'type' => 'defer_style', 'label' => 'Defer stylesheets from other sites', 'handles' => array_keys( $third ) ) ) );
+		}
 		$wait = self::handles( $rows, 'js', self::WAIT_JS, array( 'blocking', 'during_load', 'deferred' ), $covered['handles'] );
 		if ( $wait ) {
 			$offer( self::fix( 'test', 'Load captcha and chat scripts on first interaction', 'These third-party scripts are heavy and nobody needs them until they start using the page.', array( 'type' => 'delay_script', 'label' => 'Delay captcha and chat scripts', 'handles' => $wait ) ) );
+		}
+		// The hero: the element Google measured as largest if it has a background image, else the first one.
+		$heroes = $hints['hero'] ?? array();
+		$hero = null;
+		$sure = false;
+		$sel  = (string) ( $lcp['selector'] ?? '' );
+		foreach ( $heroes as $h ) {
+			if ( '' !== $sel && preg_match( '~#' . preg_quote( $h['id'], '~' ) . '(?![\w-])~', $sel ) ) {
+				$hero = $h;
+				$sure = true;
+				break;
+			}
+		}
+		// Without Google's answer only the first background counts. Anything after it is further down the page.
+		$hero = $hero ?: ( $heroes[0] ?? null );
+		if ( $hero && '' !== $hero['file'] && empty( $hero['preloaded'] ) && ! $covered['preload_image'] ) {
+			$size = null !== $hero['bytes'] ? ' It is ' . size_format( $hero['bytes'] ) . ( $hero['bytes'] > 200 * KB_IN_BYTES ? ', which is heavy for phones, so a smaller version would also help.' : '.' ) : '';
+			$offer( self::fix( 'test', 'Start loading the main image straight away', ( $sure ? 'Google measured this section as the largest element on the page. ' : 'This looks like the page\'s main image, as the first section with a background image. ' ) . 'Its image (' . basename( $hero['file'] ) . ') only starts downloading after the stylesheets that name it, which delays what visitors see first.' . $size, array( 'type' => 'preload_image', 'label' => 'Preload main image: ' . basename( $hero['file'] ), 'file' => $hero['file'] ) ) );
 		}
 		$embeds = $hints['embeds'] ?? array();
 		$videos = $hints['videos'] ?? array();
@@ -126,7 +155,7 @@ final class SSC_Speed_Suggest {
 
 	/** What enabled rules already handle. */
 	private static function covered() {
-		$c = array( 'eager_first_image' => false, 'recipes' => array(), 'preload_font' => false, 'handles' => array(), 'lazy_iframes' => false, 'video_facade' => false, 'video_preload' => false, 'video_poster_only' => false );
+		$c = array( 'preload_image' => false, 'eager_first_image' => false, 'recipes' => array(), 'preload_font' => false, 'handles' => array(), 'lazy_iframes' => false, 'video_facade' => false, 'video_preload' => false, 'video_poster_only' => false );
 		foreach ( SSC_Speed_Rules::enabled() as $r ) {
 			if ( isset( $c[ $r['type'] ] ) ) {
 				$c[ $r['type'] ] = true;

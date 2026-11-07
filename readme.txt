@@ -1,7 +1,7 @@
 === Safe Site Cleaner & Performance ===
 Requires at least: 5.9
 Requires PHP: 7.4
-Stable tag: 1.7.0
+Stable tag: 1.8.0
 License: GPL-2.0-or-later
 
 Finds unused plugins, media, leftovers and database bloat, then proves the site still works.
@@ -31,6 +31,12 @@ The Speed tab shows a page's mobile and desktop score from Google PageSpeed Insi
 adds to the page, and every CSS and JavaScript file with its size and how it loads. Checking changes
 nothing. Sending a page address to Google is how the score is measured, so the site must be public
 to get one. A free Google API key is optional and avoids the shared quota.
+
+== Main image ==
+
+A page check finds the hero image, using the element Google measured as largest when a score is
+available, and suggests preloading it so it starts downloading before the stylesheets. Limit the
+rule to the page that shows the image.
 
 == Videos and embeds ==
 

@@ -45,6 +45,7 @@ final class SSC_Speed_Assets {
 			'hints'  => array(
 				'priority_lazy' => $found['priority_lazy'],
 				'emoji'         => $found['emoji'],
+				'hero'          => self::hero_file( $found['hero'] ),
 				'embeds'        => $found['embeds'],
 				'videos'        => $found['videos'],
 				'fonts'         => self::upload_fonts( $found['fonts'] ),
@@ -67,6 +68,7 @@ final class SSC_Speed_Assets {
 		$inline_css = 0;
 		$inline_js  = 0;
 		$fonts      = array();
+		$backgrounds = array();
 		// Inline code is measured and then removed, because it can contain text that looks like a tag.
 		$html = (string) preg_replace_callback(
 			'~(<script\b[^>]*>)(.*?)</script>~is',
@@ -78,8 +80,14 @@ final class SSC_Speed_Assets {
 		);
 		$html = (string) preg_replace_callback(
 			'~<style\b[^>]*>(.*?)</style>~is',
-			static function ( $m ) use ( &$inline_css, &$fonts ) {
+			static function ( $m ) use ( &$inline_css, &$fonts, &$backgrounds ) {
 				$inline_css += strlen( $m[1] );
+				// Background images given to one element by its ID: how page builders set hero images.
+				if ( preg_match_all( '~#([A-Za-z][\w-]{0,80})\s*\{[^{}]*?background(?:-image)?\s*:[^;{}]*?url\(\s*[\'"]?([^\'")\s]+)~i', $m[1], $bg, PREG_SET_ORDER ) ) {
+					foreach ( $bg as $b ) {
+						$backgrounds[ $b[1] ] = $backgrounds[ $b[1] ] ?? $b[2];
+					}
+				}
 				if ( preg_match_all( '~@font-face\s*\{[^}]*?url\(\s*[\'"]?([^\'")\s]+\.woff2)~i', $m[1], $found ) ) {
 					$fonts = array_merge( $fonts, $found[1] );
 				}
@@ -91,10 +99,14 @@ final class SSC_Speed_Assets {
 		$assets   = array();
 		preg_match_all( '~<(link|script)\b[^>]*>~i', $html, $tags, PREG_OFFSET_CAPTURE );
 		$preloaded = array();
+		$images_preloaded = array();
 		foreach ( $tags[0] as $i => $match ) {
 			$attrs   = self::attrs( $match[0] );
 			if ( 'preload' === strtolower( $attrs['rel'] ?? '' ) && 'font' === strtolower( $attrs['as'] ?? '' ) ) {
 				$preloaded[] = basename( (string) strtok( $attrs['href'] ?? '', '?#' ) );
+			}
+			if ( 'preload' === strtolower( $attrs['rel'] ?? '' ) && 'image' === strtolower( $attrs['as'] ?? '' ) ) {
+				$images_preloaded[] = basename( (string) strtok( $attrs['href'] ?? '', '?#' ) );
 			}
 			$in_head = false === $head_end || $match[1] < $head_end;
 			$row     = 'link' === strtolower( $tags[1][ $i ][0] ) ? self::link_row( $attrs ) : self::script_row( $attrs, $in_head );
@@ -147,10 +159,52 @@ final class SSC_Speed_Assets {
 			'lazy_images' => $lazy,
 			'priority_lazy' => $late,
 			'emoji'       => $emoji,
+			'hero'        => self::hero( $html, $backgrounds, $images_preloaded ),
 			'embeds'      => $embeds,
 			'videos'      => $videos,
 			'fonts'       => array_values( $fonts ),
 		);
+	}
+
+	/**
+	 * Background images of elements, in the order they appear in the page, so the first is the likely
+	 * hero. Each says whether it is already preloaded, because then nothing should be suggested for it,
+	 * and the next one down the page is no hero.
+	 */
+	private static function hero( $html, array $backgrounds, array $preloaded ) {
+		$body = stripos( $html, '<body' );
+		$out  = array();
+		if ( ! $backgrounds || false === $body ) {
+			return $out;
+		}
+		preg_match_all( '~\sid=["\']?([A-Za-z][\w-]{0,80})~', substr( $html, $body ), $ids, PREG_OFFSET_CAPTURE );
+		foreach ( $ids[1] as $id ) {
+			if ( isset( $backgrounds[ $id[0] ] ) && ! isset( $out[ $id[0] ] ) ) {
+				$out[ $id[0] ] = array( 'id' => $id[0], 'url' => $backgrounds[ $id[0] ], 'preloaded' => in_array( basename( (string) strtok( $backgrounds[ $id[0] ], '?#' ) ), $preloaded, true ) );
+			}
+		}
+		return array_slice( array_values( $out ), 0, 5 );
+	}
+
+	/** Keeps background images that live in uploads, with their size on disk. */
+	private static function hero_file( array $list ) {
+		$base = (string) preg_replace( '~^https?:~', '', wp_get_upload_dir()['baseurl'] ) . '/';
+		$dir  = wp_get_upload_dir()['basedir'] . '/';
+		$out  = array();
+		foreach ( $list as $item ) {
+			$bare = (string) preg_replace( '~^https?:~', '', html_entity_decode( (string) strtok( $item['url'], '?#' ) ) );
+			if ( 0 === strpos( $bare, '/' ) && 0 !== strpos( $bare, '//' ) ) {
+				$bare = (string) preg_replace( '~^https?:~', '', home_url( $bare ) );
+			}
+			if ( 0 === strpos( $bare, $base ) ) {
+				$rel   = rawurldecode( substr( $bare, strlen( $base ) ) );
+				$out[] = array( 'id' => $item['id'], 'file' => $rel, 'bytes' => is_file( $dir . $rel ) ? (int) filesize( $dir . $rel ) : null, 'preloaded' => ! empty( $item['preloaded'] ) );
+			} else {
+				// Not a file this rule can preload, but it still holds the first place in the page.
+				$out[] = array( 'id' => $item['id'], 'file' => '', 'bytes' => null, 'preloaded' => ! empty( $item['preloaded'] ) );
+			}
+		}
+		return $out;
 	}
 
 	/** Font paths relative to the uploads folder. Rules can only preload fonts from there. */

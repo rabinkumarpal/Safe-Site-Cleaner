@@ -285,7 +285,7 @@ final class SSC_Rest {
 		return array(
 			'url'   => $url,
 			'page'  => $page,
-			'fixes' => ! empty( $page['assets'] ) ? SSC_Speed_Suggest::build( $page['assets'] ) : array(),
+			'fixes' => ! empty( $page['assets'] ) ? SSC_Speed_Suggest::build( $page['assets'], $page['psi']['mobile']['lcp'] ?? ( $page['psi']['desktop']['lcp'] ?? null ) ) : array(),
 		);
 	}
 

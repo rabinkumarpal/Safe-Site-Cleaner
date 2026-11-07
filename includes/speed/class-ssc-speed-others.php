@@ -18,12 +18,17 @@ final class SSC_Speed_Others {
 		'combine'     => 'combines CSS or JavaScript files',
 		'lazy_iframes' => 'lazy-loads embedded frames',
 		'youtube_facade' => 'replaces YouTube embeds with a preview image',
+		'guest'       => 'uses Guest Mode, which applies its strongest settings for first-time visitors',
 	);
 
 	/**
 	 * @return array[] Each: name, jobs (keys of JOBS), and whether those jobs are known.
 	 */
-	public static function active() {
+	/**
+	 * @param array|null $rows A page's files, when known. A plugin's settings can't always say what a
+	 *                         visitor gets, so what the page actually shows counts too.
+	 */
+	public static function active( $rows = null ) {
 		$out = array();
 		if ( defined( 'LSCWP_V' ) ) {
 			// The filter only exists while LiteSpeed is loaded, which the constant guarantees.
@@ -52,11 +57,19 @@ final class SSC_Speed_Others {
 			if ( $conf( 'media-iframe_lazy' ) ) {
 				$jobs[] = 'lazy_iframes';
 			}
+			// LiteSpeed's own code lazy-loads images and frames for guests whenever Guest Mode is on.
+			if ( $conf( 'guest_optm' ) ) {
+				$jobs = array_merge( $jobs, array( 'guest', 'lazy_images', 'lazy_iframes' ) );
+			}
+			if ( self::page_shows_delay( 'LiteSpeed Cache', $rows ) ) {
+				$jobs[] = 'delay_js';
+			}
+			$jobs = array_values( array_unique( $jobs ) );
 			$out[] = array( 'name' => 'LiteSpeed Cache', 'jobs' => $jobs, 'known' => true );
 		}
 		if ( defined( 'WP_ROCKET_VERSION' ) && function_exists( 'get_rocket_option' ) ) {
 			$jobs = array();
-			if ( get_rocket_option( 'delay_js', 0 ) ) {
+			if ( get_rocket_option( 'delay_js', 0 ) || self::page_shows_delay( 'WP Rocket', $rows ) ) {
 				$jobs[] = 'delay_js';
 			}
 			// WP Rocket switches its YouTube preview off whenever iframe lazy-load is off.
@@ -89,6 +102,22 @@ final class SSC_Speed_Others {
 			$out[] = array( 'name' => 'Perfmatters', 'jobs' => array(), 'known' => false );
 		}
 		return $out;
+	}
+
+	/** Scripts on a checked page that this plugin delays. Falls back to saved page checks. */
+	private static function page_shows_delay( $name, $rows ) {
+		if ( null === $rows && class_exists( 'SSC_Speed_Results' ) ) {
+			$rows = array();
+			foreach ( SSC_Speed_Results::all() as $page ) {
+				$rows = array_merge( $rows, (array) ( $page['assets']['assets'] ?? array() ) );
+			}
+		}
+		foreach ( (array) $rows as $r ) {
+			if ( 'delayed' === ( $r['state'] ?? '' ) && $name === ( $r['by'] ?? '' ) ) {
+				return true;
+			}
+		}
+		return false;
 	}
 
 	/** The other plugin already doing a job, or ''. */

@@ -18,6 +18,7 @@ final class SSC_Speed_Rules {
 
 	const WHAT = array(
 		'preload_font'      => 'Fetches these fonts early, so headlines do not wait behind the page\'s other files.',
+		'preload_image'     => 'Starts downloading the page\'s main image straight away, at high priority, instead of after the stylesheets that name it.',
 		'eager_first_image' => 'Stops the page builder lazy-loading the image WordPress marks as highest priority.',
 		'defer_style'       => 'Loads these stylesheets without holding up the first paint.',
 		'delay_script'      => 'Loads these scripts on the visitor\'s first scroll, pointer, touch, key or focus.',
@@ -236,6 +237,14 @@ final class SSC_Speed_Rules {
 
 	/** Only what can be known from the admin side. Handles exist only while a page renders. */
 	public static function problem( array $r ) {
+		if ( 'preload_image' === $r['type'] ) {
+			$dir = wp_get_upload_dir()['basedir'];
+			foreach ( array_filter( array( $r['file'], $r['phone_file'] ?? '' ) ) as $file ) {
+				if ( ! is_file( $dir . '/' . $file ) ) {
+					return "Image not found in uploads: $file";
+				}
+			}
+		}
 		if ( 'preload_font' === $r['type'] ) {
 			$dir = wp_get_upload_dir()['basedir'];
 			foreach ( $r['files'] as $file ) {
@@ -272,6 +281,13 @@ final class SSC_Speed_Rules {
 			case 'preload_font':
 				$rule['files'] = self::files( $row['files'] ?? null );
 				$key           = implode( ',', $rule['files'] );
+				break;
+			case 'preload_image':
+				$rule['file'] = self::image( $row['file'] ?? '' );
+				if ( ! empty( $row['phone_file'] ) ) {
+					$rule['phone_file'] = self::image( $row['phone_file'] );
+				}
+				$key = $rule['file'];
 				break;
 			case 'defer_style':
 				$rule['handles']      = self::handles( $row['handles'] ?? null );
@@ -325,6 +341,15 @@ final class SSC_Speed_Rules {
 			}
 		}
 		return $list;
+	}
+
+	/** An image path relative to the uploads folder. */
+	private static function image( $file ) {
+		$file = (string) $file;
+		if ( false !== strpos( $file, '..' ) || ! preg_match( '~^[A-Za-z0-9_.-]+(/[A-Za-z0-9_.-]+)*\.(webp|avif|jpe?g|png|gif)$~i', $file ) ) {
+			throw new InvalidArgumentException( 'Invalid image "' . sanitize_text_field( $file ) . '". Use an image path inside uploads, such as 2026/05/hero.webp.' );
+		}
+		return $file;
 	}
 
 	/** Font paths relative to the uploads folder. */

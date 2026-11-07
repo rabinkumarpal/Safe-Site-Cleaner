@@ -127,6 +127,21 @@ The **Speed** tab also holds rules that change how pages load for visitors. Rule
 
 Rules stay off unless the JSON says `"enabled": true`, and importing a rule for the same files or handles replaces the old one. They don't run in the admin, on the login page, in the Customizer or in common page builders. To turn them off anywhere else, use the `ssc_speed_skip` filter.
 
+### Main image (LCP)
+
+The `preload_image` rule starts downloading the page's main image at the top of the page, at high priority, before the stylesheets that name it. This matters most for hero images set as CSS backgrounds, which page builders often use, because the browser can't find those until the CSS has loaded.
+
+```json
+{ "type": "preload_image", "label": "Preload hero", "file": "2026/05/hero.webp", "where": { "types": ["front"] } }
+```
+
+- **Finding it:** a page check finds the hero as the first element with a background image. If Google has a score for the page, it uses the element Google measured as largest instead, and says so.
+- **Not suggested** when the image is already preloaded, so an image further down the page is never preloaded by mistake.
+- **Phone image:** add `"phone_file"` when your page builder shows a different image on phones. Each device then fetches only its own image (phones up to 767 px wide). Don't add one otherwise, because the page would still download the full image as well.
+- **Limit it to the page that shows the image** with "where", usually the home page. Preloading an image a page doesn't use wastes data.
+
+Stylesheets from other sites that block the first paint, such as review widgets, are also suggested for deferring, as a compare-first fix.
+
 ### Videos and embeds
 
 | Rule | What it does | Risk |
@@ -188,7 +203,7 @@ Safe Site Cleaner & Performance is built to run alongside caching and optimizati
 
 | Plugin | Detected | What it reads | Cache cleared after a change |
 |---|---|---|---|
-| LiteSpeed Cache | Yes | CSS async, JS defer or delay, image lazy load, emoji removal, CSS/JS combine | Yes |
+| LiteSpeed Cache | Yes | CSS async, JS defer or delay, Guest Mode, image and iframe lazy load, emoji removal, CSS/JS combine. A JavaScript delay seen on a checked page also counts, since Guest Mode can apply one the settings don't show. | Yes |
 | WP Rocket | Yes | Delay JavaScript | Yes |
 | Autoptimize | Yes | Defer CSS, defer JS, emoji removal, CSS/JS aggregation | No (it rebuilds its own files) |
 | Perfmatters | Yes | Nothing; check its settings yourself | No |

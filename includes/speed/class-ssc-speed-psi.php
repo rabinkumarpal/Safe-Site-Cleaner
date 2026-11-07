@@ -127,7 +127,21 @@ final class SSC_Speed_Psi {
 			'lab'   => $lab,
 			'field' => self::field( (array) ( $data['loadingExperience'] ?? array() ) ),
 			'fixes' => self::fixes( $audits ),
+			'lcp'   => self::lcp_element( $audits ),
 		);
+	}
+
+	/** The element Google measured as the largest, by its CSS selector. */
+	private static function lcp_element( array $audits ) {
+		foreach ( array( 'lcp-breakdown-insight', 'lcp-discovery-insight', 'largest-contentful-paint-element' ) as $key ) {
+			foreach ( (array) ( $audits[ $key ]['details']['items'] ?? array() ) as $item ) {
+				$node = ( $item['type'] ?? '' ) === 'node' ? $item : ( $item['node'] ?? null );
+				if ( is_array( $node ) && ! empty( $node['selector'] ) ) {
+					return array( 'selector' => substr( (string) $node['selector'], 0, 300 ), 'label' => wp_strip_all_tags( substr( (string) ( $node['nodeLabel'] ?? '' ), 0, 120 ) ) );
+				}
+			}
+		}
+		return null;
 	}
 
 	private static function band( $score ) {

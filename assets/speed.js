@@ -101,6 +101,7 @@
 	}
 
 	function detail(r) {
+		if (r.type === 'preload_image') { return r.file + (r.phone_file ? ' (phones: ' + r.phone_file + ')' : ''); }
 		if (r.providers) { return r.providers.join(', ') + (r.nocookie && r.providers.indexOf('youtube') >= 0 ? ' (YouTube privacy mode)' : ''); }
 		var list = r.files || r.handles;
 		if (list) { return list.join(', ') + (r.except_pages && r.except_pages.length ? ' (not on page IDs ' + r.except_pages.join(', ') + ')' : ''); }

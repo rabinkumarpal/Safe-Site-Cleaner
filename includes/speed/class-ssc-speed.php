@@ -32,6 +32,10 @@ final class SSC_Speed {
 		}
 		$types = array_column( $rules, 'type' );
 
+		if ( in_array( 'preload_image', $types, true ) ) {
+			// Before any stylesheet, so the download starts before the CSS that names the image.
+			add_action( 'wp_head', array( __CLASS__, 'preload_images' ), 1 );
+		}
 		if ( in_array( 'preload_font', $types, true ) ) {
 			add_action( 'wp_head', array( __CLASS__, 'preload_fonts' ), 2 );
 		}
@@ -157,6 +161,25 @@ final class SSC_Speed {
 			foreach ( $rule['files'] as $file ) {
 				$type = '.woff' === substr( $file, -5 ) ? 'font/woff' : 'font/woff2';
 				printf( '<link rel="preload" href="%s" as="font" type="%s" crossorigin>' . "\n", esc_url( $base . $file ), esc_attr( $type ) );
+			}
+		}
+	}
+
+	/**
+	 * With a phone image, each device fetches only its own, so a phone never downloads the large one
+	 * twice. The 767px break matches common page builders' phone width.
+	 */
+	public static function preload_images() {
+		if ( self::skip() ) {
+			return;
+		}
+		$base = wp_get_upload_dir()['baseurl'] . '/';
+		foreach ( self::here( 'preload_image' ) as $rule ) {
+			if ( ! empty( $rule['phone_file'] ) ) {
+				printf( '<link rel="preload" as="image" href="%s" media="(max-width: 767px)" fetchpriority="high">' . "\n", esc_url( $base . $rule['phone_file'] ) );
+				printf( '<link rel="preload" as="image" href="%s" media="(min-width: 768px)" fetchpriority="high">' . "\n", esc_url( $base . $rule['file'] ) );
+			} else {
+				printf( '<link rel="preload" as="image" href="%s" fetchpriority="high">' . "\n", esc_url( $base . $rule['file'] ) );
 			}
 		}
 	}
