@@ -40,6 +40,7 @@ final class SSC_Rest {
 		require_once SSC_DIR . 'includes/speed/class-ssc-speed-results.php';
 		require_once SSC_DIR . 'includes/speed/class-ssc-speed-suggest.php';
 		require_once SSC_DIR . 'includes/speed/class-ssc-speed-profile.php';
+		require_once SSC_DIR . 'includes/speed/class-ssc-speed-others.php';
 		foreach ( $routes as $r ) {
 			register_rest_route(
 				self::NS,
@@ -124,7 +125,14 @@ final class SSC_Rest {
 
 	private static function speed( WP_REST_Request $r ) {
 		$trial = SSC_Speed_Rules::trial();
-		return array( 'rules' => SSC_Speed_Rules::view(), 'trial' => (bool) $trial, 'trial_ids' => $trial ? array_keys( $trial['was'] ) : array() );
+		return array(
+			'rules'     => SSC_Speed_Rules::view(),
+			'trial'     => (bool) $trial,
+			'trial_ids' => $trial ? array_keys( $trial['was'] ) : array(),
+			'others'    => SSC_Speed_Others::view(),
+			'overlaps'  => SSC_Speed_Others::overlaps(),
+			'cleared'   => SSC_Store::$cleared,
+		);
 	}
 
 	/** A rule changing mid-cleanup would show up in the before-and-after check as damage. */
@@ -203,14 +211,14 @@ final class SSC_Rest {
 		self::assert_no_cleanup();
 		self::assert_no_trial();
 		SSC_Speed_Rules::set_enabled( (string) $r->get_param( 'id' ), (bool) $r->get_param( 'enabled' ) );
-		return array( 'rules' => SSC_Speed_Rules::view() );
+		return self::speed( $r );
 	}
 
 	private static function speed_delete( WP_REST_Request $r ) {
 		self::assert_no_cleanup();
 		self::assert_no_trial();
 		SSC_Speed_Rules::delete( (string) $r->get_param( 'id' ) );
-		return array( 'rules' => SSC_Speed_Rules::view() );
+		return self::speed( $r );
 	}
 
 	private static function speed_import( WP_REST_Request $r ) {

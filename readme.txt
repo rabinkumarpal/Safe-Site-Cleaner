@@ -1,7 +1,7 @@
 === Safe Site Cleaner ===
 Requires at least: 5.9
 Requires PHP: 7.4
-Stable tag: 1.4.1
+Stable tag: 1.5.0
 License: GPL-2.0-or-later
 
 Finds unused plugins, media, leftovers and database bloat, then proves the site still works.
@@ -39,6 +39,13 @@ defer stylesheets, delay scripts, and drop assets for unused SureForms Pro featu
 per site and can be copied to another site as JSON. A page check suggests fixes. Each one is tested on
 up to 3 real pages through signed preview links that visitors never see, then goes live as a trial
 and undoes itself if a page gets worse. These checks cannot send a form, so please try your forms.
+
+== Other speed plugins ==
+
+LiteSpeed Cache, WP Rocket, Autoptimize and Perfmatters are detected. Fixes they already do are not
+suggested, and overlapping rules show a warning. Files they build are listed under their names.
+LiteSpeed Cache, WP Rocket and WP Super Cache are cleared automatically after a change. Clear any
+other cache yourself.
 
 == Limits ==
 

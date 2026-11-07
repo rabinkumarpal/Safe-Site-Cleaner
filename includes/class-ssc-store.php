@@ -11,15 +11,36 @@ final class SSC_Store {
 	const OPTION = 'ssc_data_dir';
 
 	/** Folder for backups and quarantine. Outside the web root whenever the host allows it. */
-	/** Clears the object cache and any known page cache. */
+	/**
+	 * Clears the object cache and every page cache with a confirmed way to clear it from outside.
+	 *
+	 * @return string[] What was cleared, so the screen never claims more than that.
+	 */
 	public static function flush_caches() {
 		wp_cache_flush();
-		do_action( 'litespeed_purge_all' );
-		do_action( 'w3tc_flush_all' );
+		$done = array( 'WordPress object cache' );
+		if ( defined( 'LSCWP_V' ) ) {
+			do_action( 'litespeed_purge_all' );
+			$done[] = 'LiteSpeed Cache';
+		}
 		if ( function_exists( 'rocket_clean_domain' ) ) {
 			rocket_clean_domain();
+			$done[] = 'WP Rocket';
 		}
+		if ( function_exists( 'wp_cache_clear_cache' ) ) {
+			wp_cache_clear_cache();
+			$done[] = 'WP Super Cache';
+		}
+		if ( has_action( 'w3tc_flush_all' ) || defined( 'W3TC' ) ) {
+			do_action( 'w3tc_flush_all' );
+			$done[] = 'W3 Total Cache';
+		}
+		self::$cleared = $done;
+		return $done;
 	}
+
+	/** What the last flush cleared. */
+	public static $cleared = array();
 
 	public static function data_dir() {
 		$dir = get_option( self::OPTION );

@@ -172,10 +172,11 @@
 				el('thead', {}, el('tr', {}, [el('th', {}, 'File'), el('th', {}, 'From'), el('th', {}, 'How it loads'), el('th', { class: 'num' }, 'Size')])),
 				el('tbody', {}, shown.map(function (r) {
 					var load = LOADS[r.state] || [r.state, 'state'];
+					var label = r.state === 'delayed' && r.by ? load[0] + ' (' + r.by + ')' : load[0];
 					return el('tr', {}, [
 						el('td', {}, [r.file, el('div', { class: 'sub', title: r.url }, (r.handle ? r.handle + ' · ' : '') + r.kind.toUpperCase())]),
 						el('td', {}, r.owner),
-						el('td', {}, el('span', { class: 'pill ' + load[1] }, load[0])),
+						el('td', {}, el('span', { class: 'pill ' + load[1] }, label)),
 						el('td', { class: 'num' }, (r.bytes !== null && !r.exact ? '~' : '') + size(r.bytes))
 					]);
 				}))

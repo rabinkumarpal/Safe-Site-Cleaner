@@ -152,6 +152,26 @@ Recipes: `sureforms_unused`, `wp_emoji`, `jquery_migrate` and `dashicons_visitor
 
 After a cleanup, the result shows the home page's size, files and blocking files, plus the settings loaded on every page, before and after. With an API key on a public site, it also shows Google's mobile score. Unused items often don't load on pages at all, so these numbers may not change.
 
+## Working with other speed plugins
+
+Safe Site Cleaner is built to run alongside caching and optimization plugins. It detects these and adjusts:
+
+| Plugin | Detected | What it reads | Cache cleared after a change |
+|---|---|---|---|
+| LiteSpeed Cache | Yes | CSS async, JS defer or delay, image lazy load, emoji removal, CSS/JS combine | Yes |
+| WP Rocket | Yes | Delay JavaScript | Yes |
+| Autoptimize | Yes | Defer CSS, defer JS, emoji removal, CSS/JS aggregation | No (it rebuilds its own files) |
+| Perfmatters | Yes | Nothing; check its settings yourself | No |
+| WP Super Cache | No | None | Yes |
+| W3 Total Cache | No | None | Asks it to flush |
+
+- **No duplicate fixes:** fixes another plugin already does aren't suggested, and the Speed tab names that plugin instead.
+- **Overlap warnings:** if a rule is on and another plugin does the same job, the Speed tab warns you to keep one. Two plugins delaying or deferring the same files can conflict.
+- **Correct labels:** files those plugins build, such as `wp-content/litespeed/`, `wp-content/cache/min/` and `wp-content/cache/autoptimize/`, are listed under that plugin. Scripts they delay are listed as waiting for the visitor.
+- **Honest cache messages:** after a change, the screen names only the caches it actually cleared. Clear any other cache yourself, such as a CDN, a host's cache, WP Fastest Cache, SiteGround or Breeze.
+
+Only settings and hooks confirmed in each plugin's own source code are used. For anything else, the plugin is named but nothing is assumed about it.
+
 ## WP-CLI
 
 ```bash

@@ -179,8 +179,19 @@ final class SSC_Speed_Assets {
 		return array( 'kind' => 'css', 'url' => $a['href'], 'handle' => (string) preg_replace( '~-css$~', '', $a['id'] ?? '' ), 'state' => $state );
 	}
 
+	/** How other optimizers rewrite scripts they delay: the type they set, and where the address goes. */
+	const DELAYED_BY = array(
+		'litespeed/javascript'      => array( 'data-src', 'LiteSpeed Cache' ),
+		'text/rocketlazyloadscript' => array( 'data-rocket-src', 'WP Rocket' ),
+		'rocketlazyloadscript'      => array( 'data-rocket-src', 'WP Rocket' ),
+	);
+
 	private static function script_row( array $a, $in_head ) {
 		$type = strtolower( trim( $a['type'] ?? '' ) );
+		if ( isset( self::DELAYED_BY[ $type ] ) ) {
+			$url = $a[ self::DELAYED_BY[ $type ][0] ] ?? '';
+			return '' === $url ? null : array( 'kind' => 'js', 'url' => $url, 'handle' => (string) preg_replace( '~-js$~', '', $a['id'] ?? '' ), 'state' => 'delayed', 'by' => self::DELAYED_BY[ $type ][1] );
+		}
 		if ( '' !== $type && 'module' !== $type && false === strpos( $type, 'javascript' ) && ! isset( $a['data-ssc-delay-src'] ) ) {
 			return null;
 		}
@@ -228,6 +239,7 @@ final class SSC_Speed_Assets {
 				'owner'       => $third_party ? (string) $host : self::owner( $url ),
 				'third_party' => (bool) $third_party,
 				'state'       => $row['state'],
+				'by'          => $row['by'] ?? ( isset( $row['url'] ) && 'delayed' === $row['state'] ? 'Safe Site Cleaner' : '' ),
 				'bytes'       => $bytes,
 				'exact'       => $exact,
 			);
@@ -269,8 +281,41 @@ final class SSC_Speed_Assets {
 		return is_numeric( $len ) ? (int) $len : null;
 	}
 
+	/** Folders where other plugins write the files they build, relative to wp-content. */
+	private static function built_by() {
+		$dirs = array(
+			'litespeed/'          => 'LiteSpeed Cache (optimized files)',
+			'cache/min/'          => 'WP Rocket (optimized files)',
+			'cache/used-css/'     => 'WP Rocket (used CSS)',
+			'cache/autoptimize/'  => 'Autoptimize (optimized files)',
+			'cache/perfmatters/'  => 'Perfmatters (used CSS)',
+		);
+		// These plugins let a site move their folders, so the real locations win when they're known.
+		$moved = array(
+			'LITESPEED_STATIC_URL'       => 'LiteSpeed Cache (optimized files)',
+			'WP_ROCKET_MINIFY_CACHE_URL' => 'WP Rocket (optimized files)',
+			'WP_ROCKET_USED_CSS_URL'     => 'WP Rocket (used CSS)',
+		);
+		$out = array();
+		foreach ( $moved as $const => $name ) {
+			if ( defined( $const ) ) {
+				$out[ trailingslashit( (string) preg_replace( '~^https?:~', '', (string) constant( $const ) ) ) ] = $name;
+			}
+		}
+		$content = (string) preg_replace( '~^https?:~', '', content_url() ) . '/';
+		foreach ( $dirs as $dir => $name ) {
+			$out[ $content . $dir ] = $name;
+		}
+		return $out;
+	}
+
 	private static function owner( $url ) {
 		$bare = preg_replace( '~^https?:~', '', (string) strtok( $url, '?#' ) );
+		foreach ( self::built_by() as $base => $name ) {
+			if ( 0 === strpos( $bare, $base ) ) {
+				return $name;
+			}
+		}
 		foreach ( array( 'plugin' => plugins_url(), 'mu' => content_url( 'mu-plugins' ), 'theme' => get_theme_root_uri(), 'uploads' => wp_get_upload_dir()['baseurl'] ) as $kind => $base ) {
 			$base = preg_replace( '~^https?:~', '', untrailingslashit( $base ) ) . '/';
 			if ( 0 !== strpos( $bare, $base ) ) {
@@ -285,6 +330,10 @@ final class SSC_Speed_Assets {
 				return $theme->exists() ? $theme->get( 'Name' ) . ' (theme)' : $slug . ' (theme)';
 			}
 			return 'mu' === $kind ? 'Must-use plugins' : 'Uploads folder';
+		}
+		$content = preg_replace( '~^https?:~', '', content_url() ) . '/';
+		if ( 0 === strpos( $bare, $content ) ) {
+			return 'wp-content/' . strtok( substr( $bare, strlen( $content ) ), '/' );
 		}
 		return 'WordPress';
 	}

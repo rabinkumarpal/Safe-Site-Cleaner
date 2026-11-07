@@ -5,10 +5,28 @@
 
 	function fail(err) { render(null, box('bad', err.message)); }
 
-	var trial = false;
+	var trial = false, others = [], overlaps = [];
+
+	function keep(d) { trial = d.trial; others = d.others || []; overlaps = d.overlaps || []; }
 
 	function load(note) {
-		return api('speed').then(function (d) { trial = d.trial; render(d.rules, note); }).catch(fail);
+		return api('speed').then(function (d) { keep(d); render(d.rules, note); }).catch(fail);
+	}
+
+	/* Only what was really cleared. Other caches, a CDN or the host's, are the owner's to clear. */
+	function cleared(list) {
+		return (list && list.length ? 'Cleared: ' + list.join(', ') + '. ' : '') + 'If the site also uses another cache, such as a CDN or your host\'s cache, clear it too, then check the site in a private window.';
+	}
+
+	function othersBox() {
+		if (!others.length) { return null; }
+		return el('div', { class: 'section' }, [
+			el('h3', {}, 'Other speed plugins on this site'),
+			el('ul', { class: 'list' }, others.map(function (p) {
+				return el('li', {}, p.name + ': ' + (p.does.length ? p.does.join(', ') : p.known ? 'none of the jobs these rules do' : 'its settings could not be read, so check them for overlap yourself') + '.');
+			})),
+			overlaps.length ? box('', [el('b', {}, 'Possible conflicts:'), el('ul', { class: 'list' }, overlaps.map(function (o) { return el('li', {}, o); }))]) : null
+		]);
 	}
 	ui.speedReload = function () { return load(); };
 
@@ -37,7 +55,8 @@
 			if (ui.speedTry.isRunning()) { e.target.checked = !e.target.checked; return; }
 			on.disabled = true;
 			api('speed/toggle', 'POST', { id: r.id, enabled: e.target.checked }).then(function (d) {
-				render(d.rules, box('good', (e.target.checked ? 'Turned on: ' : 'Turned off: ') + r.label + '. Caches were cleared. Please check your site in a private window.'));
+				keep(d);
+				render(d.rules, box('good', (e.target.checked ? 'Turned on: ' : 'Turned off: ') + r.label + '. ' + cleared(d.cleared)));
 			}).catch(fail);
 		} } });
 		return el('div', { class: 'row' }, [
@@ -54,7 +73,7 @@
 			} } }, 'Test first') : null, ' ', el('button', { class: 'button-link button-link-delete', on: { click: function () {
 				if (ui.speedTry.isRunning()) { return; }
 				if (window.confirm('Remove this rule? You can add it back by importing it again.')) {
-					api('speed/delete', 'POST', { id: r.id }).then(function (d) { render(d.rules, box('good', 'Rule removed.')); }).catch(fail);
+					api('speed/delete', 'POST', { id: r.id }).then(function (d) { keep(d); render(d.rules, box('good', 'Rule removed. ' + cleared(d.cleared))); }).catch(fail);
 				}
 			} } }, 'Remove')])
 		]);
@@ -140,7 +159,8 @@
 			el('div', { class: 'card' }, [
 				el('h2', {}, 'Speed rules'),
 				el('p', { class: 'muted' }, 'Each rule changes how pages load for visitors, and only while its switch is on. Turning one off undoes it right away. "Test first" checks real pages before going live. The switch applies a rule straight away with no checks.'),
-				rules.length ? el('div', { class: 'group speed-rules' }, el('div', { class: 'rows' }, rules.map(row))) : box('', 'No rules yet. Check a page above for suggested fixes, or import a profile below.')
+				rules.length ? el('div', { class: 'group speed-rules' }, el('div', { class: 'rows' }, rules.map(row))) : box('', 'No rules yet. Check a page above for suggested fixes, or import a profile below.'),
+				othersBox()
 			]),
 			profileCard(rules)
 		);
