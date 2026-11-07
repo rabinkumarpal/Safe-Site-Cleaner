@@ -68,3 +68,7 @@
 .ssc .fix:first-of-type { border-top:0; }
 .ssc .fix .why { color:var(--muted); font-size:12px; margin-top:2px; }
 .ssc .data .sub.problem { color:var(--bad); }
+.ssc .where-editor { border:1px solid var(--line); border-radius:6px; padding:10px 14px; margin-top:8px; background:#f6f7f7; }
+.ssc .where-editor p { margin:8px 0 4px; }
+.ssc .where-types { display:grid; grid-template-columns:repeat(auto-fill,minmax(200px,1fr)); gap:4px 12px; }
+.ssc .row .where a { margin-left:4px; }

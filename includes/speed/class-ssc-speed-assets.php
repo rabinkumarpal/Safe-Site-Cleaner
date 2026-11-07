@@ -45,6 +45,8 @@ final class SSC_Speed_Assets {
 			'hints'  => array(
 				'priority_lazy' => $found['priority_lazy'],
 				'emoji'         => $found['emoji'],
+				'embeds'        => $found['embeds'],
+				'videos'        => $found['videos'],
 				'fonts'         => self::upload_fonts( $found['fonts'] ),
 			),
 			'owners' => self::owners( $rows ),
@@ -100,6 +102,27 @@ final class SSC_Speed_Assets {
 				$assets[ $row['url'] ] = $row;
 			}
 		}
+		// Embeds and videos, for the video fixes. Scripts and noscript are already gone from $html.
+		$embeds = array( 'youtube' => 0, 'vimeo' => 0, 'maps' => 0, 'not_lazy' => 0 );
+		preg_match_all( '~<iframe\b[^>]*>~i', $html, $frames );
+		foreach ( $frames[0] as $frame ) {
+			$fa = SSC_Speed_Html::attrs( $frame );
+			$p  = SSC_Speed_Html::provider( $fa );
+			if ( $p ) {
+				++$embeds[ $p['provider'] ];
+			}
+			$embeds['not_lazy'] += isset( $fa['loading'] ) || isset( $fa['data-src'] ) || isset( $fa['data-lazy-src'] ) ? 0 : 1;
+		}
+		$videos = array( 'preloading' => 0, 'background' => 0 );
+		preg_match_all( '~<video\b[^>]*>~i', $html, $vids );
+		foreach ( $vids[0] as $vid ) {
+			$va = SSC_Speed_Html::attrs( $vid );
+			if ( isset( $va['autoplay'] ) ) {
+				$videos['background'] += isset( $va['muted'] ) && ! isset( $va['controls'] ) && ! empty( $va['poster'] ) ? 1 : 0;
+			} elseif ( 'none' !== strtolower( $va['preload'] ?? 'auto' ) ) {
+				++$videos['preloading'];
+			}
+		}
 		$images = preg_match_all( '~<img\b[^>]*>~i', $html, $imgs );
 		$lazy   = 0;
 		$late   = 0;
@@ -124,6 +147,8 @@ final class SSC_Speed_Assets {
 			'lazy_images' => $lazy,
 			'priority_lazy' => $late,
 			'emoji'       => $emoji,
+			'embeds'      => $embeds,
+			'videos'      => $videos,
 			'fonts'       => array_values( $fonts ),
 		);
 	}
@@ -153,13 +178,7 @@ final class SSC_Speed_Assets {
 	}
 
 	private static function attrs( $tag ) {
-		$out = array();
-		$tag = (string) preg_replace( '~^<[a-z]+~i', '', $tag );
-		preg_match_all( '~([a-zA-Z_:][-\w:.]*)(?:\s*=\s*(?:"([^"]*)"|\'([^\']*)\'|([^\s"\'>]+)))?~', $tag, $m, PREG_SET_ORDER );
-		foreach ( $m as $a ) {
-			$out[ strtolower( $a[1] ) ] = html_entity_decode( $a[4] ?? ( $a[3] ?? ( $a[2] ?? '' ) ), ENT_QUOTES );
-		}
-		return $out;
+		return SSC_Speed_Html::attrs( $tag );
 	}
 
 	private static function link_row( array $a ) {

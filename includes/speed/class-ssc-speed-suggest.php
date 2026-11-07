@@ -65,6 +65,23 @@ final class SSC_Speed_Suggest {
 		if ( $wait ) {
 			$offer( self::fix( 'test', 'Load captcha and chat scripts on first interaction', 'These third-party scripts are heavy and nobody needs them until they start using the page.', array( 'type' => 'delay_script', 'label' => 'Delay captcha and chat scripts', 'handles' => $wait ) ) );
 		}
+		$embeds = $hints['embeds'] ?? array();
+		$videos = $hints['videos'] ?? array();
+		$found  = array_filter( array( 'youtube' => $embeds['youtube'] ?? 0, 'vimeo' => $embeds['vimeo'] ?? 0, 'maps' => $embeds['maps'] ?? 0 ) );
+		if ( $found && ! $covered['video_facade'] ) {
+			$words = array( 'youtube' => 'YouTube', 'vimeo' => 'Vimeo', 'maps' => 'Google Maps' );
+			$names = implode( ', ', array_map( static function ( $k, $n ) use ( $words ) { return $n . ' ' . $words[ $k ]; }, array_keys( $found ), $found ) );
+			$offer( self::fix( 'test', 'Load ' . $names . ' embed(s) only when clicked', 'Each embedded player downloads hundreds of KB before anyone presses play. A preview with a play button looks almost the same. YouTube then uses its privacy-enhanced mode. Autoplaying embeds will wait for a click.', array( 'type' => 'video_facade', 'label' => 'Click-to-load embeds', 'providers' => array_keys( $found ), 'nocookie' => true ) ) );
+		}
+		if ( ! empty( $embeds['not_lazy'] ) && ! $covered['lazy_iframes'] ) {
+			$offer( self::fix( 'low', 'Lazy-load ' . $embeds['not_lazy'] . ' embedded frame(s)', 'The browser then loads frames near where the visitor is scrolling, not all at once.', array( 'type' => 'lazy_iframes', 'label' => 'Lazy-load embedded frames' ) ) );
+		}
+		if ( ! empty( $videos['preloading'] ) && ! $covered['video_preload'] ) {
+			$offer( self::fix( 'low', 'Stop ' . $videos['preloading'] . ' video(s) downloading before play', 'Videos that play when clicked start downloading anyway. They will still play instantly enough for most visitors.', array( 'type' => 'video_preload', 'label' => 'Do not preload videos' ) ) );
+		}
+		if ( ! empty( $videos['background'] ) && ! $covered['video_poster_only'] ) {
+			$offer( self::fix( 'test', 'Show the poster instead of ' . $videos['background'] . ' background video(s) on phones', 'Background videos are heavy on mobile data. Phones get the still image instead, and desktops keep the video. This needs a page cache that keeps separate copies for phones.', array( 'type' => 'video_poster_only', 'label' => 'Poster only for background videos on phones', 'where' => array( 'device' => 'phone' ) ) ) );
+		}
 		if ( ! empty( $hints['fonts'] ) && ! $covered['preload_font'] ) {
 			$offer( self::fix( 'test', 'Fetch the main fonts early', 'Headlines often wait for their font. Fetching the first fonts early can help, but preloading the wrong one wastes data, so compare before applying.', array( 'type' => 'preload_font', 'label' => 'Preload main fonts', 'files' => array_slice( $hints['fonts'], 0, 2 ) ) ) );
 		}
@@ -109,7 +126,7 @@ final class SSC_Speed_Suggest {
 
 	/** What enabled rules already handle. */
 	private static function covered() {
-		$c = array( 'eager_first_image' => false, 'recipes' => array(), 'preload_font' => false, 'handles' => array() );
+		$c = array( 'eager_first_image' => false, 'recipes' => array(), 'preload_font' => false, 'handles' => array(), 'lazy_iframes' => false, 'video_facade' => false, 'video_preload' => false, 'video_poster_only' => false );
 		foreach ( SSC_Speed_Rules::enabled() as $r ) {
 			if ( isset( $c[ $r['type'] ] ) ) {
 				$c[ $r['type'] ] = true;

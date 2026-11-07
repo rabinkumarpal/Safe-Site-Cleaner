@@ -1,7 +1,7 @@
 === Safe Site Cleaner ===
 Requires at least: 5.9
 Requires PHP: 7.4
-Stable tag: 1.5.0
+Stable tag: 1.7.0
 License: GPL-2.0-or-later
 
 Finds unused plugins, media, leftovers and database bloat, then proves the site still works.
@@ -31,6 +31,18 @@ The Speed tab shows a page's mobile and desktop score from Google PageSpeed Insi
 adds to the page, and every CSS and JavaScript file with its size and how it loads. Checking changes
 nothing. Sending a page address to Google is how the score is measured, so the site must be public
 to get one. A free Google API key is optional and avoids the shared quota.
+
+== Videos and embeds ==
+
+Speed rules can show a click-to-load preview instead of YouTube, Vimeo and Google Maps embeds,
+lazy-load embedded frames, stop click-to-play videos downloading early, and show the poster
+image instead of background videos on phones. Add the class ssc-keep to leave one alone.
+
+== Where a rule applies ==
+
+Each rule can be limited to page types, address patterns such as /services/*, phones or desktop,
+and logged-out or logged-in visitors. Phone or desktop rules need a page cache that keeps
+separate copies for phones.
 
 == Speed rules ==
 

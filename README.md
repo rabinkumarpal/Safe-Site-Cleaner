@@ -127,6 +127,36 @@ The **Speed** tab also holds rules that change how pages load for visitors. Rule
 
 Rules stay off unless the JSON says `"enabled": true`, and importing a rule for the same files or handles replaces the old one. They don't run in the admin, on the login page, in the Customizer or in common page builders. To turn them off anywhere else, use the `ssc_speed_skip` filter.
 
+### Videos and embeds
+
+| Rule | What it does | Risk |
+|---|---|---|
+| `video_facade` | YouTube, Vimeo and Google Maps embeds show a preview with a play button, and the real player loads on click. YouTube uses its privacy-enhanced address, so it sets no cookies before play. | Compare first: visitors must click, and autoplaying embeds wait for that click |
+| `lazy_iframes` | Adds `loading="lazy"` to embedded frames that don't have it. | Low |
+| `video_preload` | Videos that play when clicked stop downloading first: `preload="none"` with a poster, or `"metadata"` without one. | Low |
+| `video_poster_only` | Muted, autoplaying background videos with a poster become that image. Suggested for phones only. | Compare first |
+
+- **What stays untouched:** these rules change the finished page, but never inside scripts, templates, `noscript` or comments.
+- **Opting out:** to keep one embed or video as it is, add the class `ssc-keep` or the attribute `data-ssc-keep`.
+- **Vimeo thumbnails:** these come from Vimeo's own API, fetched in the background so no visitor waits for them. Until one arrives, the preview is a dark box with a play button.
+- **Other plugins:** if LiteSpeed Cache or WP Rocket already lazy-loads iframes, or WP Rocket already replaces YouTube embeds with a preview image, that fix isn't suggested.
+
+### Where a rule applies
+
+Each rule has a **Where** setting. Leave it empty and the rule applies everywhere.
+
+| Choice | Example |
+|---|---|
+| Page types | Only the home page, single posts, or archives |
+| Only at these addresses | `/services/*` (`*` matches anything) |
+| Never at these addresses | `/checkout/*`, `/contact/` |
+| Device | Phones only, or desktop only |
+| Visitor | Logged-out visitors only, or logged-in users only |
+
+- **Device choices need a mobile-aware cache.** Phones are recognised by WordPress's own check. If your page cache keeps one copy for all devices, a phone-only rule can't work reliably, so turn on your cache plugin's separate mobile cache.
+- **Tests follow the setting.** "Test first" uses pages the rule applies to and loads them as the right device. A rule only for logged-in users can't be tested, because tests load pages as a logged-out visitor.
+- **Profiles carry it.** A "where" travels in profiles, and the import check warns if the new site lacks a content type it names.
+
 ### Testing a rule before it goes live
 
 Low-risk fixes apply with one click, and fixes marked "compare first" show you both versions before you decide. Either way, the test works like this:

@@ -110,7 +110,7 @@
 		host.textContent = '';
 		host.appendChild(el('div', { class: 'card' }, [
 			el('h2', {}, 'Testing: ' + opts.label),
-			el('p', { class: 'muted' }, 'Pages load here with and without the change. Your visitors see nothing yet.'),
+			el('p', { class: 'muted' }, 'Pages load here with and without the change' + (opts.device ? ', as a ' + opts.device : '') + '. Your visitors see nothing yet.'),
 			status,
 			s.node
 		]));
@@ -120,7 +120,7 @@
 		pages.forEach(function (url, i) {
 			chain = chain.then(function () {
 				var path = url.replace(location.origin, '');
-				return api('speed/preview', 'POST', { url: url, ids: opts.ids }).then(function (links) {
+				return api('speed/preview', 'POST', { url: url, ids: opts.ids, device: opts.device }).then(function (links) {
 					status.textContent = 'Page ' + (i + 1) + ' of ' + pages.length + ', without the change: ' + path + '. Keep this tab in view.';
 					return measure(s.frames.before, links.before).then(function (before) {
 						status.textContent = 'Page ' + (i + 1) + ' of ' + pages.length + ', with the change: ' + path;
@@ -193,7 +193,7 @@
 			measured.forEach(function (r, i) {
 				chain = chain.then(function () {
 					status.textContent = 'Checking the live page ' + (i + 1) + ' of ' + measured.length + ': ' + r.path;
-					return api('speed/preview', 'POST', { url: r.url, ids: [] }).then(function (links) {
+					return api('speed/preview', 'POST', { url: r.url, ids: opts.ids, device: opts.device }).then(function (links) {
 						return measure(s.frames.after, links.live);
 					}).then(function (live) {
 						if (!live) { problems.push(r.path + ': the live page could not be measured.'); return; }

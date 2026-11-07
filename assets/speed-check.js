@@ -267,5 +267,5 @@
 		if (state.url) { fetchSaved().catch(function () {}); }
 	}
 
-	ui.speedCheck = { host: host, start: start, refresh: refresh, pages: function () { return testPages(); } };
+	ui.speedCheck = { host: host, start: start, refresh: refresh, pages: function () { return testPages(); }, chosen: function () { return state.url; } };
 }());

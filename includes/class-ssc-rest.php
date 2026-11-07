@@ -30,6 +30,8 @@ final class SSC_Rest {
 			array( 'speed/profile-check', 'POST', 'speed_profile_check' ),
 			array( 'speed/profile-import', 'POST', 'speed_profile_import' ),
 			array( 'speed/preview', 'POST', 'speed_preview' ),
+			array( 'speed/where', 'POST', 'speed_where' ),
+			array( 'speed/test-pages', 'POST', 'speed_test_pages' ),
 			array( 'speed/trial', 'POST', 'speed_trial' ),
 			array( 'speed/keep', 'POST', 'speed_keep' ),
 			array( 'speed/undo', 'POST', 'speed_undo' ),
@@ -132,6 +134,7 @@ final class SSC_Rest {
 			'others'    => SSC_Speed_Others::view(),
 			'overlaps'  => SSC_Speed_Others::overlaps(),
 			'cleared'   => SSC_Store::$cleared,
+			'types'     => SSC_Speed_Where::type_options(),
 		);
 	}
 
@@ -182,12 +185,59 @@ final class SSC_Rest {
 	}
 
 	private static function speed_preview( WP_REST_Request $r ) {
-		$url = SSC_Speed_Results::page_url( $r->get_param( 'url' ) );
-		$ids = self::rule_ids( $r );
+		$url    = SSC_Speed_Results::page_url( $r->get_param( 'url' ) );
+		$ids    = self::rule_ids( $r );
+		$device = in_array( $r->get_param( 'device' ), array( 'phone', 'desktop' ), true ) ? $r->get_param( 'device' ) : null;
 		return array(
-			'before' => SSC_Speed::preview_url( $url, array(), $ids ),
-			'after'  => SSC_Speed::preview_url( $url, $ids, array() ),
-			'live'   => SSC_Speed::preview_url( $url, array(), array() ),
+			'before' => SSC_Speed::preview_url( $url, array(), $ids, $device ),
+			'after'  => SSC_Speed::preview_url( $url, $ids, array(), $device ),
+			'live'   => SSC_Speed::preview_url( $url, array(), array(), $device ),
+		);
+	}
+
+	private static function speed_where( WP_REST_Request $r ) {
+		self::assert_no_cleanup();
+		self::assert_no_trial();
+		SSC_Speed_Rules::set_where( (string) $r->get_param( 'id' ), $r->get_param( 'where' ) );
+		return self::speed( $r );
+	}
+
+	/**
+	 * Up to 3 pages a rule may apply to, chosen page last, plus the device to test as. A rule only for
+	 * logged-in users can't be tested, because tests load pages as a logged-out visitor.
+	 */
+	private static function speed_test_pages( WP_REST_Request $r ) {
+		$ids   = self::rule_ids( $r );
+		$rules = array_values( array_filter( SSC_Speed_Rules::all(), static function ( $x ) use ( $ids ) { return in_array( $x['id'], $ids, true ); } ) );
+		$where = array_column( $rules, 'where' );
+		foreach ( $where as $w ) {
+			if ( 'logged_in' === ( $w['visitor'] ?? 'all' ) ) {
+				return array( 'pages' => array(), 'device' => null, 'reason' => 'This rule is for logged-in users only, and tests load pages as a logged-out visitor, so it can\'t be tested here.' );
+			}
+		}
+		$chosen = (string) $r->get_param( 'chosen' );
+		$urls   = array_column( SSC_Speed_Results::pages(), 'url' );
+		if ( $chosen ) {
+			$urls = array_merge( array_diff( $urls, array( $chosen ) ), array( $chosen ) );
+		}
+		$fits = array_values(
+			array_filter(
+				$urls,
+				static function ( $url ) use ( $rules ) {
+					foreach ( $rules as $rule ) {
+						if ( ! SSC_Speed_Where::may_match_url( $rule['where'] ?? null, $url ) ) {
+							return false;
+						}
+					}
+					return true;
+				}
+			)
+		);
+		$devices = array_unique( array_filter( array_map( static function ( $w ) { return 'all' !== ( $w['device'] ?? 'all' ) ? $w['device'] : null; }, $where ) ) );
+		return array(
+			'pages'  => array_slice( $fits, -3 ),
+			'device' => 1 === count( $devices ) ? reset( $devices ) : null,
+			'reason' => $fits ? '' : 'None of the pages on the list matches where this rule applies. Check a matching page above first, so it is on the list.',
 		);
 	}
 

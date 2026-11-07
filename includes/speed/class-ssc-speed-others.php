@@ -16,6 +16,8 @@ final class SSC_Speed_Others {
 		'lazy_images' => 'lazy-loads images',
 		'emoji'       => 'removes the emoji script',
 		'combine'     => 'combines CSS or JavaScript files',
+		'lazy_iframes' => 'lazy-loads embedded frames',
+		'youtube_facade' => 'replaces YouTube embeds with a preview image',
 	);
 
 	/**
@@ -47,10 +49,24 @@ final class SSC_Speed_Others {
 			if ( $conf( 'optm-css_comb' ) || $conf( 'optm-js_comb' ) ) {
 				$jobs[] = 'combine';
 			}
+			if ( $conf( 'media-iframe_lazy' ) ) {
+				$jobs[] = 'lazy_iframes';
+			}
 			$out[] = array( 'name' => 'LiteSpeed Cache', 'jobs' => $jobs, 'known' => true );
 		}
 		if ( defined( 'WP_ROCKET_VERSION' ) && function_exists( 'get_rocket_option' ) ) {
-			$out[] = array( 'name' => 'WP Rocket', 'jobs' => get_rocket_option( 'delay_js', 0 ) ? array( 'delay_js' ) : array(), 'known' => false );
+			$jobs = array();
+			if ( get_rocket_option( 'delay_js', 0 ) ) {
+				$jobs[] = 'delay_js';
+			}
+			// WP Rocket switches its YouTube preview off whenever iframe lazy-load is off.
+			if ( get_rocket_option( 'lazyload_iframes', 0 ) ) {
+				$jobs[] = 'lazy_iframes';
+				if ( get_rocket_option( 'lazyload_youtube', 0 ) ) {
+					$jobs[] = 'youtube_facade';
+				}
+			}
+			$out[] = array( 'name' => 'WP Rocket', 'jobs' => $jobs, 'known' => false );
 		}
 		if ( defined( 'AUTOPTIMIZE_PLUGIN_VERSION' ) ) {
 			$jobs  = array();
@@ -87,7 +103,10 @@ final class SSC_Speed_Others {
 
 	/** The job another plugin may already do for a rule, or ''. */
 	public static function job_for( array $rule ) {
-		$map = array( 'defer_style' => 'defer_css', 'delay_script' => 'delay_js', 'eager_first_image' => 'lazy_images' );
+		$map = array( 'defer_style' => 'defer_css', 'delay_script' => 'delay_js', 'eager_first_image' => 'lazy_images', 'lazy_iframes' => 'lazy_iframes' );
+		if ( 'video_facade' === $rule['type'] ) {
+			return in_array( 'youtube', $rule['providers'] ?? array(), true ) ? 'youtube_facade' : '';
+		}
 		if ( 'recipe' === $rule['type'] ) {
 			return 'wp_emoji' === $rule['recipe'] ? 'emoji' : '';
 		}

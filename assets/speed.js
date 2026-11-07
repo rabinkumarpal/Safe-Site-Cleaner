@@ -5,9 +5,65 @@
 
 	function fail(err) { render(null, box('bad', err.message)); }
 
-	var trial = false, others = [], overlaps = [];
+	var trial = false, others = [], overlaps = [], types = [];
 
-	function keep(d) { trial = d.trial; others = d.others || []; overlaps = d.overlaps || []; }
+	function keep(d) { trial = d.trial; others = d.others || []; overlaps = d.overlaps || []; types = d.types || types; }
+
+	function lines(text) { return text.split(/[\n,]+/).map(function (s) { return s.trim(); }).filter(Boolean); }
+
+	/* Where a rule applies. Nothing ticked and nothing typed means everywhere. */
+	function whereEditor(r, done) {
+		var w = r.where || { types: [], include: [], exclude: [], device: 'all', visitor: 'all' };
+		var ticks = types.map(function (t) {
+			var c = el('input', { type: 'checkbox', checked: w.types.indexOf(t.value) >= 0 });
+			c.dataset.value = t.value;
+			return el('label', { class: 'where-type' }, [c, ' ' + t.label]);
+		});
+		var include = el('textarea', { rows: 2, class: 'rules-json', placeholder: '/services/*' });
+		include.value = w.include.join('\n');
+		var exclude = el('textarea', { rows: 2, class: 'rules-json', placeholder: '/checkout/*' });
+		exclude.value = w.exclude.join('\n');
+		function pick(values, current) {
+			var s = el('select', {}, values.map(function (v) { return el('option', { value: v[0] }, v[1]); }));
+			s.value = current;
+			return s;
+		}
+		var device = pick([['all', 'All devices'], ['phone', 'Phones only'], ['desktop', 'Desktop only']], w.device);
+		var visitor = pick([['all', 'Everyone'], ['logged_out', 'Logged-out visitors only'], ['logged_in', 'Logged-in users only']], w.visitor);
+		var msg = el('div', {});
+		return el('div', { class: 'where-editor' }, [
+			el('p', {}, el('b', {}, 'Page types')),
+			el('p', { class: 'muted' }, 'Tick none to apply on every page type.'),
+			el('div', { class: 'where-types' }, ticks),
+			el('p', {}, [el('b', {}, 'Only at these addresses'), el('span', { class: 'muted' }, ' One per line. * matches anything, so /services/* covers every page under /services/. Leave empty for all.')]),
+			include,
+			el('p', {}, [el('b', {}, 'Never at these addresses'), el('span', { class: 'muted' }, ' For example /checkout/* or /contact/.')]),
+			exclude,
+			el('div', { class: 'toolbar' }, [el('label', {}, ['Device: ', device]), el('label', {}, ['Visitor: ', visitor])]),
+			msg,
+			el('div', { class: 'toolbar' }, [
+				el('button', { class: 'button button-primary', on: { click: function () {
+					var where = {
+						types: ticks.map(function (l) { return l.firstChild; }).filter(function (c) { return c.checked; }).map(function (c) { return c.dataset.value; }),
+						include: lines(include.value), exclude: lines(exclude.value), device: device.value, visitor: visitor.value
+					};
+					api('speed/where', 'POST', { id: r.id, where: where }).then(function (d) {
+						keep(d);
+						render(d.rules, box('good', 'Saved where "' + r.label + '" applies. ' + (r.enabled ? cleared(d.cleared) : '')));
+					}).catch(function (e) { msg.textContent = ''; msg.appendChild(box('bad', e.message)); });
+				} } }, 'Save'),
+				el('button', { class: 'button', on: { click: done } }, 'Cancel')
+			])
+		]);
+	}
+
+	/* Tests on pages the rule may apply to, as the device it is for. */
+	function testRule(r) {
+		api('speed/test-pages', 'POST', { ids: [r.id], chosen: ui.speedCheck.chosen() }).then(function (t) {
+			if (!t.pages.length) { render(null, box('bad', t.reason)); return; }
+			ui.speedTry.test({ ids: [r.id], label: r.label, pages: t.pages, device: t.device });
+		}).catch(fail);
+	}
 
 	function load(note) {
 		return api('speed').then(function (d) { keep(d); render(d.rules, note); }).catch(fail);
@@ -45,6 +101,7 @@
 	}
 
 	function detail(r) {
+		if (r.providers) { return r.providers.join(', ') + (r.nocookie && r.providers.indexOf('youtube') >= 0 ? ' (YouTube privacy mode)' : ''); }
 		var list = r.files || r.handles;
 		if (list) { return list.join(', ') + (r.except_pages && r.except_pages.length ? ' (not on page IDs ' + r.except_pages.join(', ') + ')' : ''); }
 		return r.recipe || '';
@@ -59,17 +116,27 @@
 				render(d.rules, box('good', (e.target.checked ? 'Turned on: ' : 'Turned off: ') + r.label + '. ' + cleared(d.cleared)));
 			}).catch(fail);
 		} } });
+		var editHost = el('div', {});
+		var whereLine = el('div', { class: 'why where' }, [el('b', {}, 'Where: '), r.where_text + ' ', el('a', { href: '#', on: { click: function (e) {
+			e.preventDefault();
+			if (ui.speedTry.isRunning() || trial) { return; }
+			editHost.textContent = '';
+			editHost.appendChild(whereEditor(r, function () { editHost.textContent = ''; }));
+		} } }, 'Change')]);
+		var loggedInOnly = r.where && r.where.visitor === 'logged_in';
 		return el('div', { class: 'row' }, [
 			on,
 			el('span', {}, [
 				el('b', { class: 'label' }, r.label),
 				el('div', { class: 'why' }, r.what),
 				detail(r) ? el('div', { class: 'why target' }, detail(r)) : null,
-				r.problem ? el('div', { class: 'why problem' }, r.problem) : null
+				whereLine,
+				r.where_note ? el('div', { class: 'why problem' }, r.where_note) : null,
+				r.problem ? el('div', { class: 'why problem' }, r.problem) : null,
+				editHost
 			]),
-			el('span', { class: 'rule-actions' }, [!r.enabled && !trial ? el('button', { class: 'button', on: { click: function () {
-				if (!ui.speedCheck.pages().length) { return; }
-				ui.speedTry.test({ ids: [r.id], label: r.label, pages: ui.speedCheck.pages() });
+			el('span', { class: 'rule-actions' }, [!r.enabled && !trial && !loggedInOnly ? el('button', { class: 'button', on: { click: function () {
+				testRule(r);
 			} } }, 'Test first') : null, ' ', el('button', { class: 'button-link button-link-delete', on: { click: function () {
 				if (ui.speedTry.isRunning()) { return; }
 				if (window.confirm('Remove this rule? You can add it back by importing it again.')) {

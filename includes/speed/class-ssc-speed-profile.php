@@ -75,6 +75,11 @@ final class SSC_Speed_Profile {
 					$warnings[] = 'No page here matches the exception ' . sanitize_text_field( (string) $path ) . ', so the rule will also apply to any page meant by it.';
 				}
 			}
+			foreach ( (array) ( $rule['where']['types'] ?? array() ) as $type ) {
+				if ( 0 === strpos( $type, 'post_type:' ) && ! post_type_exists( substr( $type, 10 ) ) ) {
+					$warnings[] = 'This site has no "' . substr( $type, 10 ) . '" content type, so that part of where it applies matches nothing.';
+				}
+			}
 			if ( $seen && ! empty( $rule['handles'] ) ) {
 				$missing = array_diff( $rule['handles'], $seen );
 				if ( $missing ) {

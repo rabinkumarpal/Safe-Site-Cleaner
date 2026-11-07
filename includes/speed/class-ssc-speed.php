@@ -13,11 +13,13 @@ final class SSC_Speed {
 
 	private static $skip = null;
 	private static $deferred = null;
-	private static $delayed = array();
+	private static $delayed = null;
+	private static $here = array();
 
 	public static function boot() {
 		SSC_Speed_Recipes::watch();
 		add_action( 'ssc_speed_trial_end', array( 'SSC_Speed_Rules', 'trial' ) );
+		add_action( 'ssc_speed_vimeo_thumb', array( 'SSC_Speed_Html', 'fetch_vimeo_thumb' ) );
 		if ( is_admin() || 'wp-login.php' === ( $GLOBALS['pagenow'] ?? '' ) ) {
 			return;
 		}
@@ -40,15 +42,16 @@ final class SSC_Speed {
 		if ( in_array( 'defer_style', $types, true ) ) {
 			add_filter( 'style_loader_tag', array( __CLASS__, 'defer_style' ), 10, 2 );
 		}
-		foreach ( SSC_Speed_Rules::enabled( 'delay_script' ) as $rule ) {
-			self::$delayed = array_merge( self::$delayed, $rule['handles'] );
-		}
-		if ( self::$delayed ) {
+		if ( in_array( 'delay_script', $types, true ) ) {
 			add_filter( 'script_loader_tag', array( __CLASS__, 'delay_script' ), 10, 2 );
 			add_action( 'wp_footer', array( __CLASS__, 'delay_loader' ), 100 );
 		}
 		foreach ( SSC_Speed_Rules::enabled( 'recipe' ) as $rule ) {
 			SSC_Speed_Recipes::start( $rule['recipe'] );
+		}
+		if ( array_intersect( SSC_Speed_Html::TYPES, $types ) ) {
+			// Late, so the page's own redirects and other plugins' buffers start first.
+			add_action( 'template_redirect', array( 'SSC_Speed_Html', 'start' ), PHP_INT_MAX );
 		}
 	}
 
@@ -56,8 +59,8 @@ final class SSC_Speed {
 	 * A link that shows a page as a logged-out visitor would see it, with these rules forced on or off.
 	 * It is signed and short-lived, and it can't do more than choose between the site's own rules.
 	 */
-	public static function preview_url( $url, array $on, array $off ) {
-		$payload = rtrim( strtr( base64_encode( (string) wp_json_encode( array( 'on' => $on, 'off' => $off, 'exp' => time() + self::PREVIEW_TIME ) ) ), '+/', '-_' ), '=' );
+	public static function preview_url( $url, array $on, array $off, $device = null ) {
+		$payload = rtrim( strtr( base64_encode( (string) wp_json_encode( array( 'on' => $on, 'off' => $off, 'device' => $device, 'exp' => time() + self::PREVIEW_TIME ) ) ), '+/', '-_' ), '=' );
 		return add_query_arg(
 			array(
 				self::PREVIEW => $payload . '.' . hash_hmac( 'sha256', $payload, wp_salt( 'nonce' ) ),
@@ -83,6 +86,9 @@ final class SSC_Speed {
 			return;
 		}
 		SSC_Speed_Rules::force( array_map( 'strval', (array) $data['on'] ), array_map( 'strval', (array) $data['off'] ) );
+		if ( in_array( $data['device'] ?? null, array( 'phone', 'desktop' ), true ) ) {
+			SSC_Speed_Where::$device = $data['device'];
+		}
 		add_filter( 'determine_current_user', '__return_zero', PHP_INT_MAX );
 		add_action( 'wp_head', array( __CLASS__, 'print_probe' ), -1000 );
 		if ( ! defined( 'DONOTCACHEPAGE' ) ) {
@@ -100,6 +106,31 @@ final class SSC_Speed {
 
 	public static function print_probe() {
 		echo '<script>' . file_get_contents( SSC_DIR . 'assets/speed-probe.js' ) . "</script>\n"; // phpcs:ignore WordPress.Security.EscapeOutput,WordPress.WP.AlternativeFunctions
+	}
+
+	/**
+	 * Enabled rules that apply to this request. Where a rule applies depends on the page, which isn't
+	 * known until WordPress has run the main query, so nothing applies before that.
+	 */
+	public static function here( $type ) {
+		if ( ! did_action( 'wp' ) ) {
+			return array();
+		}
+		if ( ! isset( self::$here[ $type ] ) ) {
+			self::$here[ $type ] = array_values(
+				array_filter(
+					SSC_Speed_Rules::enabled( $type ),
+					static function ( $rule ) {
+						return SSC_Speed_Where::matches( $rule['where'] ?? null );
+					}
+				)
+			);
+		}
+		return self::$here[ $type ];
+	}
+
+	public static function recipe_here( $name ) {
+		return in_array( $name, array_column( self::here( 'recipe' ), 'recipe' ), true );
 	}
 
 	/** True where rules must stay out of the way: page builders and the Customizer. */
@@ -122,7 +153,7 @@ final class SSC_Speed {
 			return;
 		}
 		$base = wp_get_upload_dir()['baseurl'] . '/';
-		foreach ( SSC_Speed_Rules::enabled( 'preload_font' ) as $rule ) {
+		foreach ( self::here( 'preload_font' ) as $rule ) {
 			foreach ( $rule['files'] as $file ) {
 				$type = '.woff' === substr( $file, -5 ) ? 'font/woff' : 'font/woff2';
 				printf( '<link rel="preload" href="%s" as="font" type="%s" crossorigin>' . "\n", esc_url( $base . $file ), esc_attr( $type ) );
@@ -131,7 +162,7 @@ final class SSC_Speed {
 	}
 
 	public static function eager_first_image( $attr ) {
-		if ( ! self::skip() && 'high' === ( $attr['fetchpriority'] ?? '' ) ) {
+		if ( ! self::skip() && 'high' === ( $attr['fetchpriority'] ?? '' ) && self::here( 'eager_first_image' ) ) {
 			$attr['loading'] = 'eager';
 		}
 		return $attr;
@@ -152,7 +183,7 @@ final class SSC_Speed {
 		}
 		if ( null === self::$deferred ) {
 			self::$deferred = array();
-			foreach ( SSC_Speed_Rules::enabled( 'defer_style' ) as $rule ) {
+			foreach ( self::here( 'defer_style' ) as $rule ) {
 				if ( ! $rule['except_pages'] || ! is_page( $rule['except_pages'] ) ) {
 					self::$deferred = array_merge( self::$deferred, $rule['handles'] );
 				}
@@ -161,8 +192,21 @@ final class SSC_Speed {
 		return self::$deferred;
 	}
 
+	private static function delayed_handles() {
+		if ( ! did_action( 'wp' ) ) {
+			return array();
+		}
+		if ( null === self::$delayed ) {
+			self::$delayed = array();
+			foreach ( self::here( 'delay_script' ) as $rule ) {
+				self::$delayed = array_merge( self::$delayed, $rule['handles'] );
+			}
+		}
+		return self::$delayed;
+	}
+
 	public static function delay_script( $tag, $handle ) {
-		if ( self::skip() || ! in_array( $handle, self::$delayed, true ) ) {
+		if ( self::skip() || ! in_array( $handle, self::delayed_handles(), true ) ) {
 			return $tag;
 		}
 		return str_replace( ' src=', ' data-ssc-delay-src=', $tag );
@@ -173,7 +217,7 @@ final class SSC_Speed {
 			return;
 		}
 		$printed = array_filter(
-			self::$delayed,
+			self::delayed_handles(),
 			static function ( $handle ) {
 				return wp_script_is( $handle, 'done' );
 			}

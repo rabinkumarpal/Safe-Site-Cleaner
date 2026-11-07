@@ -67,7 +67,7 @@ final class SSC_Speed_Recipes {
 	/* These wait for 'wp' because the page builder check isn't reliable until the theme has loaded. */
 
 	public static function drop_emoji() {
-		if ( SSC_Speed::skip() ) {
+		if ( SSC_Speed::skip() || ! SSC_Speed::recipe_here( 'wp_emoji' ) ) {
 			return;
 		}
 		remove_action( 'wp_head', 'print_emoji_detection_script', 7 );
@@ -76,7 +76,7 @@ final class SSC_Speed_Recipes {
 	}
 
 	public static function drop_migrate() {
-		if ( SSC_Speed::skip() ) {
+		if ( SSC_Speed::skip() || ! SSC_Speed::recipe_here( 'jquery_migrate' ) ) {
 			return;
 		}
 		$jquery = wp_scripts()->registered['jquery'] ?? null;
@@ -86,13 +86,13 @@ final class SSC_Speed_Recipes {
 	}
 
 	public static function drop_dashicons() {
-		if ( ! is_user_logged_in() && ! SSC_Speed::skip() ) {
+		if ( ! is_user_logged_in() && ! SSC_Speed::skip() && SSC_Speed::recipe_here( 'dashicons_visitors' ) ) {
 			wp_dequeue_style( 'dashicons' );
 		}
 	}
 
 	public static function drop_sureforms() {
-		if ( ! defined( 'SRFM_PRO_VER' ) || SSC_Speed::skip() ) {
+		if ( ! defined( 'SRFM_PRO_VER' ) || SSC_Speed::skip() || ! SSC_Speed::recipe_here( 'sureforms_unused' ) ) {
 			return;
 		}
 		foreach ( self::sureforms_unused() as $feature ) {

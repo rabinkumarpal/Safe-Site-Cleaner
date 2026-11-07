@@ -22,6 +22,10 @@ final class SSC_Speed_Rules {
 		'defer_style'       => 'Loads these stylesheets without holding up the first paint.',
 		'delay_script'      => 'Loads these scripts on the visitor\'s first scroll, pointer, touch, key or focus.',
 		'recipe'            => 'Drops assets a plugin loads for features this site does not use.',
+		'lazy_iframes'      => 'Lets the browser wait to load embedded frames, such as maps and widgets, until a visitor scrolls near them.',
+		'video_facade'      => 'Shows a preview with a play button instead of the embedded player. The real player loads when a visitor clicks.',
+		'video_preload'     => 'Stops videos that only play when clicked from downloading before anyone presses play.',
+		'video_poster_only' => 'Shows the poster image instead of a muted background video that plays by itself.',
 	);
 
 	public static function all() {
@@ -171,6 +175,26 @@ final class SSC_Speed_Rules {
 		self::save( $rules );
 	}
 
+	public static function set_where( $id, $where ) {
+		$where = SSC_Speed_Where::clean( $where );
+		$rules = self::all();
+		$found = false;
+		foreach ( $rules as &$r ) {
+			if ( $id === $r['id'] ) {
+				unset( $r['where'] );
+				if ( $where ) {
+					$r['where'] = $where;
+				}
+				$found = true;
+			}
+		}
+		unset( $r );
+		if ( ! $found ) {
+			throw new InvalidArgumentException( 'Unknown rule.' );
+		}
+		self::save( $rules );
+	}
+
 	public static function delete( $id ) {
 		$rules = self::all();
 		$kept  = array_values(
@@ -191,8 +215,10 @@ final class SSC_Speed_Rules {
 	public static function view() {
 		return array_map(
 			static function ( $r ) {
-				$r['what']    = self::what( $r );
-				$r['problem'] = self::problem( $r );
+				$r['what']       = self::what( $r );
+				$r['problem']    = self::problem( $r );
+				$r['where_text'] = SSC_Speed_Where::describe( $r['where'] ?? null );
+				$r['where_note'] = 'all' !== ( $r['where']['device'] ?? 'all' ) ? 'Phone or desktop rules only work if your page cache keeps separate copies for phones. Otherwise one cached copy is shown on every device. Check your cache plugin\'s mobile setting.' : '';
 				return $r;
 			},
 			self::all()
@@ -258,6 +284,16 @@ final class SSC_Speed_Rules {
 				$rule['handles'] = self::handles( $row['handles'] ?? null );
 				$key             = implode( ',', $rule['handles'] );
 				break;
+			case 'video_facade':
+				$providers = array_values( array_intersect( array( 'youtube', 'vimeo', 'maps' ), array_map( 'strval', (array) ( $row['providers'] ?? array( 'youtube', 'vimeo' ) ) ) ) );
+				if ( ! $providers ) {
+					throw new InvalidArgumentException( 'Choose at least one of youtube, vimeo or maps.' );
+				}
+				$rule['providers'] = $providers;
+				// Privacy-enhanced mode unless the rule says otherwise: YouTube sets no cookies before play.
+				$rule['nocookie'] = false !== ( $row['nocookie'] ?? true );
+				$key              = 'video';
+				break;
 			case 'recipe':
 				$rule['recipe'] = (string) ( $row['recipe'] ?? '' );
 				if ( ! SSC_Speed_Recipes::exists( $rule['recipe'] ) ) {
@@ -265,6 +301,11 @@ final class SSC_Speed_Rules {
 				}
 				$key = $rule['recipe'];
 				break;
+		}
+		// Where a rule applies isn't part of its ID, so changing it edits the same rule.
+		$where = SSC_Speed_Where::clean( $row['where'] ?? null );
+		if ( $where ) {
+			$rule['where'] = $where;
 		}
 		$rule['id'] = 'r' . substr( md5( $type . '|' . $key ), 0, 10 );
 		if ( '' === $rule['label'] ) {
